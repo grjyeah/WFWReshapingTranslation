@@ -667,6 +667,28 @@ Task / 任务
 
         return translated_text
 
+    def _generate_timestamped_filename(self, base_name: str) -> str:
+        """
+        生成带时间戳的文件名
+
+        Args:
+            base_name: 基础文件名（如 "processed_chinese.txt"）
+
+        Returns:
+            带时间戳的文件名（如 "processed_chinese_20251225_143020.txt"）
+        """
+        from datetime import datetime
+
+        # 获取当前时间戳
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # 分离文件名和扩展名
+        if '.' in base_name:
+            name, ext = base_name.rsplit('.', 1)
+            return f"{name}_{timestamp}.{ext}"
+        else:
+            return f"{base_name}_{timestamp}"
+
     def process_and_translate(self, transcript: str,
                               save_intermediate: bool = True) -> Dict[str, str]:
         """
@@ -684,17 +706,29 @@ Task / 任务
             processed_chinese = self.process_transcript(transcript)
 
             if save_intermediate:
-                with open("processed_chinese.txt", "w", encoding="utf-8") as f:
+                # 生成带时间戳的文件名
+                chinese_filename = self._generate_timestamped_filename("processed_chinese.txt")
+                chinese_filepath = f"processed/{chinese_filename}"
+
+                # 确保processed文件夹存在
+                import os
+                os.makedirs("processed", exist_ok=True)
+
+                with open(chinese_filepath, "w", encoding="utf-8") as f:
                     f.write(processed_chinese)
-                print(f"\n✓ 中文处理结果已保存到: processed_chinese.txt")
+                print(f"\n✓ 中文处理结果已保存到: {chinese_filepath}")
 
             # 步骤2: 翻译成英文
             english_translation = self.translate_to_english(processed_chinese)
 
             if save_intermediate:
-                with open("english_translation.txt", "w", encoding="utf-8") as f:
+                # 生成带时间戳的文件名
+                english_filename = self._generate_timestamped_filename("english_translation.txt")
+                english_filepath = f"processed/{english_filename}"
+
+                with open(english_filepath, "w", encoding="utf-8") as f:
                     f.write(english_translation)
-                print(f"\n✓ 英文翻译结果已保存到: english_translation.txt")
+                print(f"\n✓ 英文翻译结果已保存到: {english_filepath}")
 
             return {
                 "chinese": processed_chinese,

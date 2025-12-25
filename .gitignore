@@ -36,3 +36,6 @@ Thumbs.db
 # 临时文件
 *.tmp
 *.temp
+
+# 处理后的输出文件夹（带时间戳的文件）
+processed/
