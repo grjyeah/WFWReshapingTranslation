@@ -752,7 +752,7 @@ if __name__ == "__main__":
     # 读取输入文件
     print("读取会议逐字稿...")
     try:
-        with open("meeting_transcript.txt", "r", encoding="utf-8") as f:
+        with open("input_scripts\meeting_transcript.txt", "r", encoding="utf-8") as f:
             transcript = f.read()
 
         print(f"原始文本长度: {len(transcript)} 字符")
