@@ -39,3 +39,4 @@ Thumbs.db
 
 # 处理后的输出文件夹（带时间戳的文件）
 processed/
+processed_backup/
