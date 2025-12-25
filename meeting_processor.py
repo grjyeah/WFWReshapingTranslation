@@ -752,7 +752,7 @@ if __name__ == "__main__":
     # 读取输入文件
     print("读取会议逐字稿...")
     try:
-        with open("input_scripts\meeting_transcript.txt", "r", encoding="utf-8") as f:
+        with open("input_scripts/meeting_transcript.txt", "r", encoding="utf-8") as f:
             transcript = f.read()
 
         print(f"原始文本长度: {len(transcript)} 字符")
@@ -767,13 +767,13 @@ if __name__ == "__main__":
         print(f"原始文本: {len(transcript)} 字符")
         print(f"处理后中文: {len(results['chinese'])} 字符")
         print(f"英文翻译: {len(results['english'])} 字符")
-        print(f"\n中间文件:")
-        print(f"  - processed_chinese.txt (中文会议纪要)")
-        print(f"  - english_translation.txt (英文翻译)")
+        print(f"\n输出文件已保存到 processed/ 文件夹:")
+        print(f"  - processed_chinese_<时间戳>.txt (中文会议纪要)")
+        print(f"  - english_translation_<时间戳>.txt (英文翻译)")
 
     except FileNotFoundError:
-        print("错误: 找不到 meeting_transcript.txt 文件")
-        print("\n请创建该文件并将会议逐字稿内容放入其中")
+        print("错误: 找不到 input_scripts/meeting_transcript.txt 文件")
+        print("\n请确保 input_scripts/meeting_transcript.txt 文件存在")
         print("或者使用以下代码直接处理文本：\n")
         print('transcript = """[说话人1]：那个...我觉得...呃...这个项目..."""')
         print("results = processor.process_and_translate(transcript)")
