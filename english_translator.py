@@ -11,15 +11,24 @@ class EnglishTranslator:
     """中文会议纪要翻译成英文"""
 
     def __init__(self, ollama_url: str = "http://localhost:11434",
-                 model_name: str = "yasserrmd/Qwen2.5-7B-Instruct-1M:latest"):
+                 # model_name: str = "yasserrmd/Qwen2.5-7B-Instruct-1M:latest"):
+                 model_name: str = "alibayram/Qwen3-30B-A3B-Instruct-2507:latest"):
         self.ollama_url = ollama_url
         self.model_name = model_name
         self.api_endpoint = f"{ollama_url}/api/generate"
 
         # 模型参数配置（优化为精简书面化输出）
         self.model_options = {
+            "mirostat": 2,
+            "mirostat_tau": 3.5,  # 中 → 英翻译 / 中英混合输出，降低随机性，提升术语一致性与语法正确性
+            "mirostat_eta": 0.1,
+            "repeat_penalty": 1.1,
+            "num_thread": 8,  # GPU offload 后，CPU 只需处理剩余层，8 线程足够
+            "num_batch": 512,  # 默认即可，或设为 1024 提升吞吐
+            "rope_frequency_base": 1000000,  # Qwen 长文本适配
+
             "num_ctx": 131072,  # 上下文窗口大小
-            "num_predict": 4096,  # 限制最大输出，防止过度冗长
+            "num_predict": 8192,  # 限制最大输出，防止过度冗长
             "temperature": 0.5,  # 降低温度，使输出更简洁规范
             "top_p": 0.85,  # 降低top-p，减少发散
             "top_k": 30,  # 降低top-k，更聚焦
@@ -162,7 +171,8 @@ class EnglishTranslator:
             "model": self.model_name,
             "prompt": prompt,
             "stream": use_stream,
-            "options": self.model_options
+            "options": self.model_options,
+            "num_gpu_layers": 60  # 根据你的GPU显存调整数值
         }
 
         for attempt in range(max_retries + 1):
