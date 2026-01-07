@@ -9,24 +9,15 @@ class ChineseFormatter:
     """中文会议逐字稿书面化处理"""
 
     def __init__(self, ollama_url: str = "http://localhost:11434",
-                 # model_name: str = "yasserrmd/Qwen2.5-7B-Instruct-1M:latest"):
-                 model_name: str = "alibayram/Qwen3-30B-A3B-Instruct-2507:latest"):
+                 model_name: str = "yasserrmd/Qwen2.5-7B-Instruct-1M:latest"):
         self.ollama_url = ollama_url
         self.model_name = model_name
         self.api_endpoint = f"{ollama_url}/api/generate"
 
         # 模型参数配置（优化为精简书面化输出）
         self.model_options = {
-            "mirostat": 2,
-            "mirostat_tau": 5.0,  # 中文连贯性最佳区间
-            "mirostat_eta": 0.1,
-            "repeat_penalty": 1.15,
-            "num_thread": 8,  # GPU offload 后，CPU 只需处理剩余层，8 线程足够
-            "num_batch": 512,  # 默认即可，或设为 1024 提升吞吐
-            "rope_frequency_base": 1000000,   # Qwen 长文本适配
-
             "num_ctx": 131072,  # 上下文窗口大小
-            "num_predict": 8192,  # 限制最大输出，防止过度冗长
+            "num_predict": 4096,  # 限制最大输出，防止过度冗长
             "temperature": 0.5,  # 降低温度，使输出更简洁规范
             "top_p": 0.85,  # 降低top-p，减少发散
             "top_k": 30,  # 降低top-k，更聚焦
@@ -50,7 +41,12 @@ Task / 任务
    - 保留所有说话人的所有发言内容
 
 2. ✍️ **书面化改写** ✍️
-   - 删除所有口语词："那个"、"然后"、"就是说"、"呃"、"嗯"、"啊"等
+   - 删除所有口语词："那个"、"然后"、"就是说"、"呃"、"嗯"、"啊"、"吧"、"呢"、"呀"、"那"等
+   - 禁用口语副词如“挺”“蛮”“超”“巨”“贼”“老……了”
+   - 禁用口语疑问词如“啥”“咋”“干嘛”
+   - 避免使用“搞”“弄”“东东”“人家”“哥们儿/姐们儿”等非正式用词
+   - 不使用“有点儿”“还行”“差不多”“好吧”“行吧”“没事”“没关系”等模糊或随意表达
+   - 避免主观句式如“我觉得”“我想”“你知道吗”“说白了”“反正”等，改用客观、严谨的陈述
    - 保留所有实质性内容、数据、观点、讨论细节
    - 将口语表达改为正式书面语表达
    - 润色语言，使表达更专业、更规范
@@ -364,8 +360,7 @@ Task / 任务
             "model": self.model_name,
             "prompt": prompt,
             "stream": use_stream,
-            "options": self.model_options,
-            "num_gpu_layers": 60  # 根据你的GPU显存调整数值
+            "options": self.model_options
         }
 
         for attempt in range(max_retries + 1):
@@ -406,6 +401,69 @@ Task / 任务
                     print(f"\n  ❌ API调用错误: {err}")
                     return ""
 
+        return ""
+
+    def call_vllm(self, prompt: str, max_retries: int = 2, use_stream: bool = False) -> str:
+        """
+        调用本地 vllm-server (OpenAI 兼容 API)，替代 Ollama
+        Args:
+            prompt: 输入提示词
+            max_retries: 最大重试次数
+            use_stream: 是否流式输出（当前暂不支持，设为 False）
+        Returns:
+            模型生成的文本
+        """
+        api_endpoint = "http://localhost:8000/v1/chat/completions"
+
+        temperature = self.model_options.get("temperature", 0.5)
+        top_p = self.model_options.get("top_p", 0.85)
+        max_tokens = min(self.model_options.get("num_predict", 4096), 4096)
+        stop = self.model_options.get("stop", ["\n\n\n", "============", "End of", "【结束】"])
+
+        payload = {
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "top_p": top_p,
+            # 注意：移除了 top_k, repeat_penalty 等 vLLM 不支持的参数
+            "max_tokens": max_tokens,
+            "stop": stop,
+            "stream": False
+        }
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = requests.post(
+                    api_endpoint,
+                    json=payload,
+                    timeout=300  # 5分钟超时
+                )
+                response.raise_for_status()
+                result = response.json()
+
+                # 提取生成内容
+                if "choices" in result and len(result["choices"]) > 0:
+                    text = result["choices"][0]["message"]["content"].strip()
+                    if text:
+                        return text
+
+                if attempt < max_retries:
+                    print(f" 第{attempt + 1}次尝试返回空结果，重试中...")
+                else:
+                    print(f" ❌ 所有重试失败，返回空")
+                    return ""
+
+            except requests.exceptions.Timeout as err:
+                if attempt < max_retries:
+                    print(f"\n ⏱️ 第{attempt + 1}次尝试超时，重试中...")
+                else:
+                    print(f"\n ❌ API调用超时: {err}")
+                    return ""
+            except Exception as err:
+                if attempt < max_retries:
+                    print(f"\n 🔄 第{attempt + 1}次尝试出错: {err}，重试中...")
+                else:
+                    print(f"\n ❌ API调用错误: {err}")
+                    return ""
         return ""
 
     def _stream_response(self, payload: dict, attempt: int) -> str:
@@ -540,7 +598,7 @@ Task / 任务
             )
 
             # 调用模型
-            result = self.call_ollama(prompt)
+            result = self.call_vllm(prompt)
 
             if result:
                 # 先去重，再检查长度
@@ -559,7 +617,7 @@ Task / 任务
                 # 如果输出过短（<60%），可能信息丢失，尝试重新生成
                 if result_ratio < 60:
                     print(f"\n  ⚠️ 输出过短 ({len(result)} 字符, {result_ratio:.1f}%)，可能信息丢失，重新生成...")
-                    result = self.call_ollama(prompt)
+                    result = self.call_vllm(prompt)
                     if result:
                         result = self.remove_duplicates(result)
                     result_ratio = len(result) / chunk_length * 100 if result else 0
