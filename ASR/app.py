@@ -578,6 +578,7 @@ class FunASRWebUI:
                                     speaker = str(row['说话人']).replace('\t', ' ')
                                     start_time = str(row['开始时间']).replace('\t', ' ')
                                     end_time = str(row['结束时间']).replace('\t', ' ')
+                                    # 文本列已经包含【说话人X】标签，直接使用即可
                                     content = str(row['文本']).replace('\t', ' ').replace('\n', ' ')
 
                                     text += f"{speaker}\t{start_time}\t{end_time}\t{content}\n"
@@ -742,7 +743,9 @@ class FunASRWebUI:
                                 if timestamp_text and len(timestamp_text) > 0:
                                     sentence = " ".join([ts[2] for ts in timestamp_text if len(ts) > 2])
 
-                            speaker_data.append([speaker, start_time, end_time, sentence])
+                            # 在文本前面添加说话人标签
+                            sentence_with_label = f"【说话人:{speaker}】{sentence}"
+                            speaker_data.append([speaker, start_time, end_time, sentence_with_label])
                         speaker_df = pd.DataFrame(speaker_data, columns=["说话人", "开始时间", "结束时间", "文本"])
                     elif not capabilities["supports_speaker_diarization"] and spk_res:
                         # 为不支持的模型创建提示信息
