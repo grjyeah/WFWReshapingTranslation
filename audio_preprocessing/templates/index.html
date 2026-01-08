@@ -181,60 +181,85 @@
 
                 <!-- 处理参数 -->
                 <div class="bg-white rounded-2xl card-shadow p-6">
-                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <h2 class="text-xl font-semibold mb-2 flex items-center">
                         <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
                         </svg>
                         处理参数
                     </h2>
 
+                    <!-- 快速提示 -->
+                    <div class="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                        <div class="flex items-start space-x-2">
+                            <svg class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div class="text-sm text-gray-700">
+                                <span class="font-semibold text-blue-800">想让小声音变大？</span>
+                                <span class="text-gray-600">阈值调到 -25~-30dB，释放时间调到 100ms，点击处理即可</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="space-y-6">
                         <!-- 阈值 -->
                         <div>
                             <div class="flex justify-between mb-2">
-                                <label class="text-sm font-medium text-gray-700">压缩阈值</label>
-                                <span id="thresholdValue" class="text-sm font-bold text-indigo-600">-20.0 dB</span>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-700">压缩阈值</label>
+                                    <span class="ml-2 text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">↓越低，小声音越大</span>
+                                </div>
+                                <span id="thresholdValue" class="text-sm font-bold text-indigo-600">-30.0 dB</span>
                             </div>
-                            <input type="range" id="threshold" min="-60" max="0" step="1" value="-20">
+                            <input type="range" id="threshold" min="-60" max="0" step="1" value="-30">
                             <div class="flex justify-between text-xs text-gray-400 mt-1">
-                                <span>-60 dB</span>
-                                <span>0 dB</span>
+                                <span>-60 dB (强)</span>
+                                <span>0 dB (弱)</span>
                             </div>
                         </div>
 
                         <!-- 压缩比 -->
                         <div>
                             <div class="flex justify-between mb-2">
-                                <label class="text-sm font-medium text-gray-700">压缩比</label>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-700">压缩比</label>
+                                    <span class="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded">↑越高，声音越平</span>
+                                </div>
                                 <span id="ratioValue" class="text-sm font-bold text-indigo-600">4.0:1</span>
                             </div>
                             <input type="range" id="ratio" min="1" max="20" step="0.5" value="4.0">
                             <div class="flex justify-between text-xs text-gray-400 mt-1">
                                 <span>1:1 (无压缩)</span>
-                                <span>20:1 (极限压缩)</span>
+                                <span>20:1 (极限)</span>
                             </div>
                         </div>
 
                         <!-- 启动时间 -->
                         <div>
                             <div class="flex justify-between mb-2">
-                                <label class="text-sm font-medium text-gray-700">启动时间</label>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-700">启动时间</label>
+                                    <span class="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">一般保持5ms</span>
+                                </div>
                                 <span id="attackValue" class="text-sm font-bold text-indigo-600">5.0 ms</span>
                             </div>
                             <input type="range" id="attack" min="0.1" max="50" step="0.1" value="5.0">
                             <div class="flex justify-between text-xs text-gray-400 mt-1">
-                                <span>0.1 ms</span>
-                                <span>50 ms</span>
+                                <span>0.1 ms (快)</span>
+                                <span>50 ms (慢)</span>
                             </div>
                         </div>
 
                         <!-- 释放时间 -->
                         <div>
                             <div class="flex justify-between mb-2">
-                                <label class="text-sm font-medium text-gray-700">释放时间</label>
-                                <span id="releaseValue" class="text-sm font-bold text-indigo-600">50.0 ms</span>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-700">释放时间</label>
+                                    <span class="ml-2 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded">↑越长，小声音提升越多</span>
+                                </div>
+                                <span id="releaseValue" class="text-sm font-bold text-indigo-600">100.0 ms</span>
                             </div>
-                            <input type="range" id="release" min="10" max="500" step="1" value="50.0">
+                            <input type="range" id="release" min="10" max="500" step="1" value="100.0">
                             <div class="flex justify-between text-xs text-gray-400 mt-1">
                                 <span>10 ms</span>
                                 <span>500 ms</span>
