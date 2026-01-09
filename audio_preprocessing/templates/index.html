@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GPU音频处理 - RTX 5090加速</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/tailwind.js"></script>
     <style>
         /* 自定义样式 */
         .gradient-bg {
@@ -146,16 +146,16 @@
                         <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                         </svg>
-                        上传音频文件
+                        上传音频/视频文件
                     </h2>
 
                     <div id="uploadZone" class="upload-zone rounded-xl p-12 text-center cursor-pointer">
-                        <input type="file" id="fileInput" class="hidden" accept=".wav,.mp3,.flac,.m4a,.aac,.ogg">
+                        <input type="file" id="fileInput" class="hidden" accept=".wav,.mp3,.flac,.m4a,.aac,.ogg,.mp4,.avi,.mov,.mkv,.wmv,.flv,.webm">
                         <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
                         </svg>
-                        <p class="text-lg text-gray-600 mb-2">点击选择或拖拽音频文件到此处</p>
-                        <p class="text-sm text-gray-400">支持格式: WAV, MP3, FLAC, M4A, AAC, OGG</p>
+                        <p class="text-lg text-gray-600 mb-2">点击选择或拖拽音频/视频文件到此处</p>
+                        <p class="text-sm text-gray-400">支持格式: 音频(WAV, MP3, FLAC, M4A, AAC, OGG) / 视频(MP4, AVI, MOV, MKV, WMV, FLV, WebM)</p>
                     </div>
 
                     <!-- 文件信息 -->
@@ -413,7 +413,7 @@
                     <div class="space-y-3 text-sm text-gray-700">
                         <div class="flex items-start space-x-2">
                             <span class="flex-shrink-0 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
-                            <p>上传音频文件（支持拖拽）</p>
+                            <p>上传音频/视频文件（支持拖拽）</p>
                         </div>
 
                         <div class="flex items-start space-x-2">
@@ -651,7 +651,10 @@
 
         // 处理文件
         function handleFile(file) {
-            const validExtensions = ['.wav', '.mp3', '.flac', '.m4a', '.aac', '.ogg'];
+            // 支持音频和视频格式
+            const audioExtensions = ['.wav', '.mp3', '.flac', '.m4a', '.aac', '.ogg'];
+            const videoExtensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'];
+            const validExtensions = [...audioExtensions, ...videoExtensions];
             const fileExt = '.' + file.name.split('.').pop().toLowerCase();
 
             if (!validExtensions.includes(fileExt)) {
@@ -670,7 +673,7 @@
         // 开始处理
         async function startProcessing() {
             if (!currentFile) {
-                showAlert('请先选择音频文件', 'error');
+                showAlert('请先选择音频或视频文件', 'error');
                 return;
             }
 

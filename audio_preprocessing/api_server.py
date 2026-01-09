@@ -44,6 +44,13 @@ app.add_middleware(
 TEMP_DIR = Path("./temp_uploads")
 TEMP_DIR.mkdir(exist_ok=True)
 
+# 静态文件目录
+static_dir = Path(__file__).parent / "static"
+static_dir.mkdir(exist_ok=True)
+
+# 挂载静态文件服务
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 # 模板目录
 templates_dir = Path(__file__).parent / "templates"
 
@@ -94,22 +101,25 @@ async def health_check():
 @app.post("/api/upload")
 async def upload_audio(file: UploadFile = File(...)):
     """
-    上传音频文件
+    上传音频/视频文件
 
     Args:
-        file: 音频文件
+        file: 音频或视频文件
 
     Returns:
         JSON响应，包含文件名和存储路径
     """
     # 验证文件类型
-    allowed_extensions = {'.wav', '.mp3', '.flac', '.m4a', '.aac', '.ogg'}
+    audio_extensions = {'.wav', '.mp3', '.flac', '.m4a', '.aac', '.ogg'}
+    video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'}
+    allowed_extensions = audio_extensions | video_extensions
+
     file_ext = Path(file.filename).suffix.lower()
 
     if file_ext not in allowed_extensions:
         raise HTTPException(
             status_code=400,
-            detail=f"不支持的文件格式: {file_ext}。支持的格式: {', '.join(allowed_extensions)}"
+            detail=f"不支持的文件格式: {file_ext}"
         )
 
     # 保存文件
@@ -119,14 +129,74 @@ async def upload_audio(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        file_type = "视频" if file_ext in video_extensions else "音频"
         logger.info(f"文件上传成功: {file.filename} -> {file_path}")
+
+        # 如果是视频文件，提取音频
+        actual_filename = file.filename
+        actual_file_path = str(file_path)
+
+        if file_ext in video_extensions:
+            logger.info(f"检测到视频文件，正在提取音频...")
+            try:
+                # 使用moviepy提取音频
+                from moviepy.editor import VideoFileClip
+
+                # 生成音频文件名
+                audio_filename = f"{Path(file.filename).stem}.wav"
+                audio_file_path = TEMP_DIR / audio_filename
+
+                # 提取音频
+                logger.info(f"开始提取音频: {file.filename} -> {audio_filename}")
+                video_clip = VideoFileClip(str(file_path))
+                video_clip.audio.write_audiofile(
+                    str(audio_file_path),
+                    codec='pcm_s16le',
+                    fps=44100
+                )
+                video_clip.close()
+
+                logger.info(f"音频提取完成: {audio_filename}")
+
+                # 删除原视频文件以节省空间
+                file_path.unlink()
+
+                # 更新文件信息
+                actual_filename = audio_filename
+                actual_file_path = str(audio_file_path)
+
+                return {
+                    "success": True,
+                    "filename": actual_filename,
+                    "path": actual_file_path,
+                    "size": audio_file_path.stat().st_size,
+                    "message": f"视频文件，音频已提取",
+                    "file_type": "video",
+                    "original_file": file.filename
+                }
+
+            except ImportError:
+                logger.error("需要安装moviepy: pip install moviepy")
+                raise HTTPException(
+                    status_code=500,
+                    detail="视频处理功能需要安装moviepy库"
+                )
+            except Exception as e:
+                logger.error(f"音频提取失败: {e}")
+                # 提取失败，删除视频文件
+                file_path.unlink()
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"音频提取失败: {str(e)}"
+                )
 
         return {
             "success": True,
-            "filename": file.filename,
-            "path": str(file_path),
+            "filename": actual_filename,
+            "path": actual_file_path,
             "size": file_path.stat().st_size,
-            "message": "文件上传成功"
+            "message": f"{file_type}文件上传成功",
+            "file_type": "audio"
         }
 
     except Exception as e:

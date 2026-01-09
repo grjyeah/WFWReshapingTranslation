@@ -11,6 +11,9 @@ torchaudio>=2.1.0
 pydub>=0.25.1
 numpy>=1.24.0
 
+# 视频处理
+moviepy>=1.0.3
+
 # 工具库
 tqdm>=4.66.0
 pathlib
