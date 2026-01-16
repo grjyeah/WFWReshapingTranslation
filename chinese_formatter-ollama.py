@@ -9,7 +9,8 @@ class ChineseFormatter:
     """中文会议逐字稿书面化处理"""
 
     def __init__(self, ollama_url: str = "http://localhost:11434",
-                 model_name: str = "yasserrmd/Qwen2.5-7B-Instruct-1M:latest"):
+                 # model_name: str = "yasserrmd/Qwen2.5-7B-Instruct-1M:latest"):
+                 model_name: str = "did100/qwen2.5-32B-Instruct-Q4_K_M:latest"):
                  # model_name: str = "alibayram/Qwen3-30B-A3B-Instruct-2507:latest"):
         self.ollama_url = ollama_url
         self.model_name = model_name
@@ -37,71 +38,139 @@ class ChineseFormatter:
         }
 
         # 提示词模板
-        self.processing_prompt = """Role / 角色
-你是一位专业的语言编辑，擅长将口语化的会议逐字稿转换为正式的书面语文档。
+        self.processing_prompt = """<instructions>
+    <role>
+        你是一位专业的语言编辑，擅长将口语化的会议逐字稿转换为正式的书面语文档。
+    </role>
 
-Task / 任务
-⚠️ 【核心要求 - 逐句转换，不做总结】⚠️
+    <task>
+        <requirement type="core" priority="highest">
+            <title>核心要求 - 逐句转换，不做总结</title>
+            <item id="1">
+                <name>逐句转换</name>
+                <rules>
+                    <rule>对原文中的每一句话进行书面化改写，不要无中生有</rule>
+                    <rule>严禁总结、概括或归纳</rule>
+                    <rule>输入文本每句话换一行，但输出需根据说话人标签把同一个人说的话合并到一个段落，不要单句分行</rule>
+                    <rule>保留所有说话人的所有发言内容</rule>
+                    <rule>每句话开始有对应的说话人标签，例如【说话人:0】、【说话人:1】等</rule>
+                    <rule>根据标签区分同一个说话人的内容，如果是同一说话人，把内容合并放到一个段落中，不需要太多换行</rule>
+                    <rule condition="empty_content">如果整句话判断为纯口语没有输出，这行不需要输出，不用输出空白的行</rule>
+                    <rule condition="empty_content">例如【说话人:X】：(标签后只有换行符)【说话人:X】：(标签后没内容)的，连标签也不需要输出</rule>
+                </rules>
+            </item>
 
-1. 📝 **逐句转换** 📝
-   - 对原文中的每一句话进行书面化改写，不要无中生有
-   - 严禁总结、概括或归纳
-   - 输入的文本是每句话换一行，但输出我希望根据说话人标签把同一个人说的话合并到一个段落，不要单句分行
-   - 保留所有说话人的所有发言内容
-   - 每一句话开始有对应的说话人标签，例如【说话人:0】、【说话人:1】等，注意根据标签来区分是否同一个说话人的内容，如果是同一个说话人，把内容合并放到一个段落中，不需要太多的换行
-   - 如果整句话都判断为纯口语没有输出的情况，这行不需要输出，不用输出空白的行，例如【说话人:X】：     换行符     【说话人:X】：   标签后面没内容的连这行的标签也不需要输出  
+            <item id="2">
+                <name>书面化改写</name>
+                <rules>
+                    <rule>删除所有口语词："那个"、"然后"、"就是说"、"呃"、"嗯"、"啊"、"呢"、"哇"等</rule>
+                    <rule>保留所有实质性内容、数据、观点、讨论细节</rule>
+                    <rule>将口语表达改为正式书面语表达</rule>
+                    <rule>润色语言，使表达更专业、更规范</rule>
+                </rules>
+            </item>
 
-2. ✍️ **书面化改写** ✍️
-   - 删除所有口语词："那个"、"然后"、"就是说"、"呃"、"嗯"、"啊"等
-   - 保留所有实质性内容、数据、观点、讨论细节
-   - 将口语表达改为正式书面语表达
-   - 润色语言，使表达更专业、更规范
+            <item id="3" type="prohibition">
+                <name>严禁以下行为</name>
+                <prohibitions>
+                    <prohibition>严禁删除任何发言内容</prohibition>
+                    <prohibition>严禁总结概括（如"主要讨论了"、"重点提到"）</prohibition>
+                    <prohibition>严禁合并句子或段落</prohibition>
+                    <prohibition>严禁提炼要点</prohibition>
+                    <prohibition>严禁添加原文中没有的内容</prohibition>
+                </prohibitions>
+            </item>
 
-3. 🚫 **严禁以下行为** 🚫
-   - 严禁删除任何发言内容
-   - 严禁总结概括（如"主要讨论了"、"重点提到"）
-   - 严禁合并句子或段落
-   - 提炼要点
-   - 添加原文中没有的内容
+            <item id="4">
+                <name>输出格式要求</name>
+                <requirements>
+                    <requirement>保留所有说话人标识</requirement>
+                    <requirement>保留原有的对话结构和顺序</requirement>
+                    <requirement>每个说话人的发言都要完整保留</requirement>
+                    <requirement>语言风格：正式、专业、客观</requirement>
+                </requirements>
+            </item>
 
-4. 📋 **输出格式要求** 📋
-   - 保留所有说话人标识
-   - 保留原有的对话结构和顺序
-   - 每个说话人的发言都要完整保留
-   - 语言风格：正式、专业、客观
+            <item id="5" type="prohibition">
+                <name>严禁输出无关内容</name>
+                <prohibitions>
+                    <prohibition>严禁添加任何标题（如"### 会议记录"、"【逐句书面化改写】"）</prohibition>
+                    <prohibition>严禁添加说明性文字（如"以下是..."、"改写如下："）</prohibition>
+                    <prohibition>严禁添加前言、后语、总结性文字</prohibition>
+                    <prohibition priority="critical">只输出对话本身，从第一个说话人开始，到最后一个说话人结束</prohibition>
+                    <prohibition priority="critical">不要有任何其他文字，只要对话</prohibition>
+                </prohibitions>
+            </item>
 
-5. 🚫 **严禁输出无关内容** 🚫
-   - 严禁添加任何标题（如"### 会议记录"、"【逐句书面化改写】"）
-   - 严禁添加说明性文字（如"以下是..."、"改写如下："）
-   - 严禁添加前言、后语、总结性文字
-   - **只输出对话本身，从第一个说话人开始，到最后一个说话人结束**
-   - **不要有任何其他文字，只要对话**
+            <item id="6">
+                <name>格式要求</name>
+                <formatting_rules>
+                    <rule id="speaker_label">
+                        <name>说话人标识格式统一</name>
+                        <description>使用【说话人姓名】（书名号），不要用方括号[]</description>
+                    </rule>
+                    <rule id="paragraph_organization">
+                        <name>段落组织</name>
+                        <description>同一个说话人的连续发言，合并为一个完整的语义段落</description>
+                    </rule>
+                    <rule id="line_break">
+                        <name>换行规则</name>
+                        <description>每个说话人的完整语义段落结束后，必须换行（每个说话人占一行）</description>
+                    </rule>
+                    <rule id="sentence_continuity">
+                        <name>不要多句话换行</name>
+                        <description>将同一说话人的相关句子组织成连贯的段落</description>
+                    </rule>
+                    <rule id="one_speaker_one_paragraph">
+                        <name>一个说话人=一个段落</name>
+                        <format>【说话人】：完整内容（可包含多个句子）然后换行</format>
+                    </rule>
+                </formatting_rules>
+            </item>
 
-6. 📝 **格式要求** 📝
-   - **说话人标识格式统一**：使用【说话人姓名】（书名号），不要用方括号[]
-   - **段落组织**：同一个说话人的连续发言，合并为一个完整的语义段落
-   - **换行规则**：每个说话人的完整语义段落结束后，必须换行（每个说话人占一行）
-   - **不要多句话换行**：将同一说话人的相关句子组织成连贯的段落
-   - **一个说话人=一个段落**：格式为"【说话人】：完整内容（可包含多个句子）"然后换行
+            <item id="7">
+                <name>输出示例</name>
+                <examples>
+                    <example type="correct">
+                        <description>正确格式</description>
+                        <content>
+                            【主持人】：大家好，欢迎参加今天的会议。今天我们主要讨论数据治理的相关工作。
+                            
+                            【张总】：我们需要建立一个完善的数据治理体系。数据治理非常重要，对企业的数字化转型至关重要。
+                            
+                            【李经理】：我同意张总的说法。我们的平台能够提供有效的支持。
+                        </content>
+                    </example>
+                    <example type="incorrect">
+                        <description>错误格式</description>
+                        <errors>
+                            <error>【主持人】：大家好，【张总】：我们需要建立...（不要把不同说话人放在一起）</error>
+                            <error>【主持人】：大家好。今天我们讨论。相关的工作。（同一说话人的相关句子不要断开）</error>
+                        </errors>
+                    </example>
+                </examples>
+                <core_principle>逐句书面化改写，不删不减，保留说话人，一个说话人一个段落！</core_principle>
+            </item>
+        </requirement>
+    </task>
 
-7. 📋 **输出示例** 📋
-正确格式：
-【主持人】：大家好，欢迎参加今天的会议。今天我们主要讨论数据治理的相关工作。
+    <input>
+        <metadata>
+            <original_text_length unit="characters">{text_length}</original_text_length>
+        </metadata>
+        <content>
+            <![CDATA[{text}]]>
+        </content>
+    </input>
 
-【张总】：我们需要建立一个完善的数据治理体系。数据治理非常重要，对企业的数字化转型至关重要。
-
-【李经理】：我同意张总的说法。我们的平台能够提供有效的支持。
-
-错误格式：
-【主持人】：大家好，【张总】：我们需要建立...（不要把不同说话人放在一起）
-【主持人】：大家好。今天我们讨论。相关的工作。（同一说话人的相关句子不要断开）
-
-⚠️ 核心原则：逐句书面化改写，不删不减，保留说话人，一个说话人一个段落！⚠️
-
-原文（{text_length}字）：
-{text}
-
-请直接输出逐句书面化改写后的对话（目标长度：约{target_length}字，允许±10%），严格按照上述示例格式："""
+    <output_requirement>
+        <target_length unit="characters">
+            <value>{target_length}</value>
+            <tolerance>±10%</tolerance>
+        </target_length>
+        <format>严格按照上述示例格式，直接输出逐句书面化改写后的对话</format>
+    </output_requirement>
+</instructions>"""
 
     def split_text(self, text: str, max_chars: int = 1000) -> List[str]:
         """

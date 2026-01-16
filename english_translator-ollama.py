@@ -12,7 +12,8 @@ class EnglishTranslator:
 
     def __init__(self, ollama_url: str = "http://localhost:11434",
                  # model_name: str = "yasserrmd/Qwen2.5-7B-Instruct-1M:latest"):
-                 model_name: str = "alibayram/Qwen3-30B-A3B-Instruct-2507:latest"):
+                 model_name: str = "did100/qwen2.5-32B-Instruct-Q4_K_M:latest"):
+                 # model_name: str = "alibayram/Qwen3-30B-A3B-Instruct-2507:latest"):
         self.ollama_url = ollama_url
         self.model_name = model_name
         self.api_endpoint = f"{ollama_url}/api/generate"
@@ -39,15 +40,140 @@ class EnglishTranslator:
         }
 
         # 翻译提示词模板
-        self.translation_prompt = """请将以下中文会议纪要翻译成英文。要求：
-1. 保持专业的商务/学术语言风格
-2. 保留说话人标识格式：[Speaker Name/Role]:
-3. 确保翻译准确、流畅、地道
-4. 不要添加任何额外说明
+        self.translation_prompt = """<instructions>
+    <role>
+        你是一位专业的中英翻译专家，擅长将中文会议纪要翻译成地道的英文，具备丰富的商务和学术翻译经验。
+    </role>
 
-需要翻译的内容：
+    <task>
+        <requirement type="translation" priority="highest">
+            <title>将中文会议纪要翻译成英文</title>
 
-{text}"""
+            <item id="1">
+                <name>语言风格要求</name>
+                <rules>
+                    <rule>保持专业的商务/学术语言风格</rule>
+                    <rule>使用正式、得体的商务英语表达</rule>
+                    <rule>确保语气专业、客观、规范</rule>
+                    <rule>术语翻译准确统一，使用行业标准表达</rule>
+                </rules>
+            </item>
+
+            <item id="2">
+                <name>格式保留要求</name>
+                <formatting_rules>
+                    <rule id="speaker_label">
+                        <name>说话人标识格式</name>
+                        <description>必须保留所有说话人标识，确保对话结构完整</description>
+                        <format>[Speaker Name/Role]:</format>
+                        <note>将中文说话人名称翻译成英文（如"主持人"→"Moderator"，"张总"→"Mr. Zhang"）</note>
+                    </rule>
+                    <rule id="paragraph_structure">
+                        <name>段落结构</name>
+                        <description>保持原有的段落组织和换行结构</description>
+                    </rule>
+                    <rule id="dialogue_flow">
+                        <name>对话流程</name>
+                        <description>维持对话的原始顺序和逻辑关系</description>
+                    </rule>
+                </formatting_rules>
+            </item>
+
+            <item id="3">
+                <name>翻译质量要求</name>
+                <quality_requirements>
+                    <requirement priority="critical">准确性：准确传达原文意思，不遗漏信息，不添加内容</requirement>
+                    <requirement priority="high">流畅性：符合英文表达习惯，避免中式英语</requirement>
+                    <requirement priority="high">地道性：使用地道的商务/学术英语表达方式</requirement>
+                    <requirement>一致性：相同术语和表达方式保持翻译一致</requirement>
+                    <requirement>可读性：译文通顺易读，符合专业商务英语规范</requirement>
+                </quality_requirements>
+            </item>
+
+            <item id="4" type="prohibition">
+                <name>输出规范</name>
+                <prohibitions>
+                    <prohibition>严禁添加任何额外说明或解释</prohibition>
+                    <prohibition>严禁添加翻译注释或脚注</prohibition>
+                    <prohibition>严禁添加"以下是翻译结果"等引导语</prohibition>
+                    <prohibition>严禁添加"翻译完成"、"翻译如下"等总结语</prohibition>
+                    <prohibition priority="critical">只输出翻译后的英文对话，不要有任何其他文字</prohibition>
+                </prohibitions>
+            </item>
+
+            <item id="5">
+                <name>特殊处理规则</name>
+                <special_rules>
+                    <rule id="speaker_names">
+                        <name>说话人名称翻译</name>
+                        <examples>
+                            <example source="主持人" target="Moderator" />
+                            <example source="张总" target="Mr. Zhang" />
+                            <example source="李经理" target="Manager Li" />
+                            <example source="王专家" target="Expert Wang" />
+                        </examples>
+                    </rule>
+                    <rule id="technical_terms">
+                        <name>专业术语处理</name>
+                        <description>使用行业标准术语，确保专业性和准确性</description>
+                    </rule>
+                    <rule id="titles_and_roles">
+                        <name>职务称呼翻译</name>
+                        <description>职务名称使用标准英文表达，保持商务礼仪</description>
+                    </rule>
+                </special_rules>
+            </item>
+
+            <item id="6">
+                <name>输出示例</name>
+                <examples>
+                    <example type="correct">
+                        <description>正确格式</description>
+                        <source>
+                            【主持人】：大家好，欢迎参加今天的会议。今天我们主要讨论数据治理的相关工作。
+                            
+                            【张总】：我们需要建立一个完善的数据治理体系。数据治理非常重要，对企业的数字化转型至关重要。
+                        </source>
+                        <target>
+                            [Moderator]: Good morning, everyone. Welcome to today's meeting. Today, we will primarily discuss data governance initiatives.
+                            
+                            [Mr. Zhang]: We need to establish a comprehensive data governance framework. Data governance is critical for the digital transformation of our enterprise.
+                        </target>
+                    </example>
+                    <example type="incorrect">
+                        <description>错误格式</description>
+                        <errors>
+                            <error>以下是翻译结果：（不要添加引导语）</error>
+                            <error>【主持人】：Good morning everyone. Today we discuss data governance.（说话人标识未翻译）</error>
+                            <error>Moderator：Good morning.（未使用英文标识格式 [Speaker]:）</error>
+                        </errors>
+                    </example>
+                </examples>
+                <core_principle>准确翻译，保持格式，地道表达，只输出译文！</core_principle>
+            </item>
+        </requirement>
+    </task>
+
+    <input>
+        <metadata>
+            <source_language>Chinese (Simplified)</source_language>
+            <target_language>English</target_language>
+            <content_type>Meeting Minutes</content_type>
+        </metadata>
+        <content>
+            <![CDATA[{text}]]>
+        </content>
+    </input>
+
+    <output_requirement>
+        <format>直接输出翻译后的英文文本，保持原有格式和说话人标识，不要添加任何其他文字</format>
+        <constraints>
+            <constraint>必须翻译所有内容</constraint>
+            <constraint>必须保持说话人标识格式</constraint>
+            <constraint>必须保持段落结构</constraint>
+        </constraints>
+    </output_requirement>
+</instructions>"""
 
     def split_text(self, text: str, max_chars: int = 1500) -> List[str]:
         """
