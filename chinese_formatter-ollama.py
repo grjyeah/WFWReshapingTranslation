@@ -8,33 +8,25 @@ from difflib import SequenceMatcher
 class ChineseFormatter:
     """中文会议逐字稿书面化处理"""
 
-    def __init__(self, ollama_url: str = "http://localhost:11434",
-                 # model_name: str = "yasserrmd/Qwen2.5-7B-Instruct-1M:latest"):
-                 model_name: str = "did100/qwen2.5-32B-Instruct-Q4_K_M:latest"):
-                 # model_name: str = "alibayram/Qwen3-30B-A3B-Instruct-2507:latest"):
-        self.ollama_url = ollama_url
+    def __init__(self, lm_studio_url: str = "http://127.0.0.1:1234",
+                 model_name: str = "qwen2.5-14b-instruct-1m"):
+        self.lm_studio_url = lm_studio_url
         self.model_name = model_name
-        self.api_endpoint = f"{ollama_url}/api/generate"
+        self.api_endpoint = f"{lm_studio_url}/v1/chat/completions"
 
-        # 模型参数配置（优化为精简书面化输出）
+        # 模型参数配置（优化为精简书面化输出）- LM Studio OpenAI兼容格式
         self.model_options = {
-            # "mirostat": 2,
-            # "mirostat_tau": 5.0,  # 中文连贯性最佳区间
-            # "mirostat_eta": 0.1,
-            "repeat_penalty": 1.15,
-            "num_thread": 8,  # GPU offload 后，CPU 只需处理剩余层，8 线程足够
-            "num_batch": 512,  # 默认即可，或设为 1024 提升吞吐
-            "rope_frequency_base": 1000000,   # Qwen 长文本适配
-
-            "num_ctx": 131072,  # 上下文窗口大小
-            "num_predict": 8192,  # 限制最大输出，防止过度冗长
+            # 模型质量参数
             "temperature": 0.3,  # 降低温度，使输出更简洁规范
             "top_p": 0.85,  # 降低top-p，减少发散
-            "top_k": 30,  # 降低top-k，更聚焦
-            "repeat_penalty": 1.15,  # 提高重复惩罚，避免啰嗦
+            "max_tokens": 8192,  # 限制最大输出，防止过度冗长
             "presence_penalty": 0.2,  # 提高存在惩罚
             "frequency_penalty": 0.2,  # 提高频率惩罚
-            "stop": ["\n\n\n", "============", "End of", "【结束】"]  # 添加停止词
+            "stop": ["\n\n\n", "============", "End of", "【结束】"],  # 添加停止词
+
+            # 思考模式控制（如果模型支持）
+            # "include_reasoning": False,  # 某些模型使用此参数
+            # "reasoning_effort": "none",   # 某些模型使用此参数
         }
 
         # 提示词模板
@@ -50,12 +42,11 @@ class ChineseFormatter:
                 <name>逐句转换</name>
                 <rules>
                     <rule>对原文中的每一句话进行书面化改写，不要无中生有</rule>
-                    <rule>严禁总结、概括或归纳</rule>
-                    <rule>输入文本每句话换一行，但输出需根据说话人标签把同一个人说的话合并到一个段落，不要单句分行</rule>
+                    <rule>严禁自己总结、概括或归纳，输出的结果请完全依照原文，仅做书面化语句调整</rule>
+                    <rule>输入文本每句话换一行，根据标签区分同一个说话人的内容，输出需根据同一说话人标签整合，把同一个人说的话合并到一个段落，不要单句分行</rule>
                     <rule>保留所有说话人的所有发言内容</rule>
                     <rule>每句话开始有对应的说话人标签，例如【说话人:0】、【说话人:1】等</rule>
-                    <rule>根据标签区分同一个说话人的内容，如果是同一说话人，把内容合并放到一个段落中，不需要太多换行</rule>
-                    <rule condition="empty_content">如果整句话判断为纯口语没有输出，这行不需要输出，不用输出空白的行</rule>
+                    <rule condition="empty_content">如果原文较为口语化，请判断是否有有效内容产出，如果没有有效表达，无需输出</rule>
                     <rule condition="empty_content">例如【说话人:X】：(标签后只有换行符)【说话人:X】：(标签后没内容)的，连标签也不需要输出</rule>
                 </rules>
             </item>
@@ -63,10 +54,10 @@ class ChineseFormatter:
             <item id="2">
                 <name>书面化改写</name>
                 <rules>
-                    <rule>删除所有口语词："那个"、"然后"、"就是说"、"呃"、"嗯"、"啊"、"呢"、"哇"等</rule>
+                    <rule>删除所有口语词："那个"、"然后"、"就是说"、"呃"、"嗯"、"啊"、"呢"、"哇"、"这样"等</rule>
                     <rule>保留所有实质性内容、数据、观点、讨论细节</rule>
                     <rule>将口语表达改为正式书面语表达</rule>
-                    <rule>润色语言，使表达更专业、更规范</rule>
+                    <rule>润色语言，使表达更专业、更规范，精炼措辞，提升专业性和一致性（如"要"替换成"须"）</rule>
                 </rules>
             </item>
 
@@ -119,7 +110,7 @@ class ChineseFormatter:
                     </rule>
                     <rule id="sentence_continuity">
                         <name>不要多句话换行</name>
-                        <description>将同一说话人的相关句子组织成连贯的段落</description>
+                        <description>同一说话人的相关句子应自然衔接，形成流畅段落</description>
                     </rule>
                     <rule id="one_speaker_one_paragraph">
                         <name>一个说话人=一个段落</name>
@@ -169,6 +160,11 @@ class ChineseFormatter:
             <tolerance>±10%</tolerance>
         </target_length>
         <format>严格按照上述示例格式，直接输出逐句书面化改写后的对话</format>
+        <special_requirements>
+            <requirement priority="critical">严禁输出思考过程、推理步骤或中间分析</requirement>
+            <requirement priority="critical">直接输出最终结果，不要有任何前缀、说明或思考内容</requirement>
+            <requirement>不要使用"让我分析"、"首先"、"接下来"等表达思考过程的词语</requirement>
+        </special_requirements>
     </output_requirement>
 </instructions>"""
 
@@ -421,7 +417,7 @@ class ChineseFormatter:
 
     def call_ollama(self, prompt: str, max_retries: int = 2, use_stream: bool = True) -> str:
         """
-        调用本地Ollama模型，支持流式输出和重试机制
+        调用本地LM Studio模型（OpenAI兼容API），支持流式输出和重试机制
 
         Args:
             prompt: 输入提示词
@@ -431,12 +427,14 @@ class ChineseFormatter:
         Returns:
             模型生成的文本
         """
+        # 使用OpenAI兼容格式（LM Studio）
         payload = {
             "model": self.model_name,
-            "prompt": prompt,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
             "stream": use_stream,
-            "options": self.model_options,
-            "num_gpu_layers": 60  # 根据你的GPU显存调整数值
+            **self.model_options
         }
 
         for attempt in range(max_retries + 1):
@@ -449,12 +447,12 @@ class ChineseFormatter:
                     response = requests.post(
                         self.api_endpoint,
                         json=payload,
-                        timeout=180  # 3分钟超时（从10分钟缩短）
+                        timeout=180  # 3分钟超时
                     )
                     response.raise_for_status()
 
                     result = response.json()
-                    response_text = result.get('response', '').strip()
+                    response_text = result['choices'][0]['message']['content'].strip()
 
                     if response_text:
                         return response_text
@@ -481,7 +479,7 @@ class ChineseFormatter:
 
     def _stream_response(self, payload: dict, attempt: int) -> str:
         """
-        流式响应处理，智能检测重复并停止
+        流式响应处理（LM Studio OpenAI兼容格式），智能检测重复并停止
 
         Args:
             payload: 请求payload
@@ -516,20 +514,30 @@ class ChineseFormatter:
             for line in response.iter_lines():
                 if line:
                     try:
-                        data = json.loads(line)
-                        if 'response' in data:
-                            response_text += data['response']
-                            last_output_time = time.time()
-                            no_output_count = 0
+                        # OpenAI兼容格式：line以"data: "开头
+                        line_str = line.decode('utf-8') if isinstance(line, bytes) else line
+                        if line_str.startswith('data: '):
+                            data_str = line_str[6:]  # 移除 "data: " 前缀
 
-                            # 每1000个字符显示一个点
-                            if len(response_text) % 1000 < 50:
-                                print(".", end="", flush=True)
+                            # 检查是否结束（[DONE]）
+                            if data_str.strip() == '[DONE]':
+                                print("] ", end="", flush=True)
+                                break
 
-                        # 检查是否完成
-                        if data.get('done', False):
-                            print("] ", end="", flush=True)
-                            break
+                            data = json.loads(data_str)
+
+                            # OpenAI格式：choices[0].delta.content
+                            if 'choices' in data and len(data['choices']) > 0:
+                                delta = data['choices'][0].get('delta', {})
+                                if 'content' in delta:
+                                    content = delta['content']
+                                    response_text += content
+                                    last_output_time = time.time()
+                                    no_output_count = 0
+
+                                    # 每1000个字符显示一个点
+                                    if len(response_text) % 1000 < 50:
+                                        print(".", end="", flush=True)
 
                         # 定期检查是否有新输出
                         current_time = time.time()
@@ -714,8 +722,8 @@ class ChineseFormatter:
 if __name__ == "__main__":
     # 初始化处理器
     formatter = ChineseFormatter(
-        ollama_url="http://localhost:11434",
-        model_name="yasserrmd/Qwen2.5-7B-Instruct-1M:latest"
+        lm_studio_url="http://127.0.0.1:1234",
+        model_name="qwen2.5-14b-instruct-1m"
     )
 
     # 读取输入文件
