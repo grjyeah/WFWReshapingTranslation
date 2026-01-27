@@ -132,8 +132,9 @@ class FunASRWebUI:
         """获取模型功能支持情况"""
         # 根据FunASR文档，只有这两个模型支持时间戳预测和说话人分离
         timestamp_models = {
-            "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
-            "iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
+            "/root/FunASR/models/modelscope/iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+            "/root/FunASR/models/modelscope/iic/speech_fsmn_vad_zh-cn-16k-common-pytorch"
+            # "/root/FunASR/models/modelscope/iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
         }
 
         model_id = MODEL_CONFIG["asr_models"].get(model_name, "")
