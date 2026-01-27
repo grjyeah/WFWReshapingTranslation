@@ -33,27 +33,27 @@ except ImportError as e:
 LOADED_MODELS = {}
 MODEL_CONFIG = {
     "asr_models": {
-        "SenseVoiceSmall": "iic/SenseVoiceSmall",
-        "Paraformer-zh": "paraformer-zh",
-        "Paraformer-zh-streaming": "paraformer-zh-streaming",
-        "SeACoParaformer": "iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
-        "EngParaformer": "iic/speech_paraformer-large-vad-punc_asr_nat-en-16k-common-vocab10020",
+        "SenseVoiceSmall": "/root/FunASR/models/modelscope/iic/SenseVoiceSmall",
+        "Paraformer-zh": "/root/FunASR/models/modelscope/iic/paraformer-zh",
+        "Paraformer-zh-streaming": "/root/FunASR/models/modelscope/iic/paraformer-zh-streaming",
+        "SeACoParaformer": "/root/FunASR/models/modelscope/iic/speech_seaco_paraformer_large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+        "EngParaformer": "/root/FunASR/models/modelscope/iic/speech_paraformer-large-vad-punc_asr_nat-en-16k-common-vocab10020",
         "Paraformer-en": "paraformer-en",
-        "Conformer-en": "conformer-en",
-        "Whisper-large-v3": "Whisper-large-v3",
-        "Whisper-large-v3-turbo": "Whisper-large-v3-turbo"
+        "Conformer-en": "/root/FunASR/models/modelscope/iic/conformer-en",
+        "Whisper-large-v3": "/root/FunASR/models/modelscope/iic/Whisper-large-v3",
+        "Whisper-large-v3-turbo": "/root/FunASR/models/modelscope/iic/Whisper-large-v3-turbo"
     },
     "vad_models": {
         "None": None,
-        "FSMN-VAD": "fsmn-vad"
+        "FSMN-VAD": "/root/FunASR/models/modelscope/iic/speech_fsmn_vad_zh-cn-16k-common-pytorch"
     },
     "punc_models": {
         "None": None,
-        "CT-Transformer": "ct-punc"
+        "CT-Transformer": "/root/FunASR/models/modelscope/iic/punc_ct-transformer_cn-en-common-vocab471067-large"
     },
     "spk_models": {
         "None": None,
-        "CAM++": "cam++"
+        "CAM++": "/root/FunASR/models/modelscope/iic/speech_campplus_sv_zh-cn_16k-common"
     },
     "emotion_models": {
         "None": None,
