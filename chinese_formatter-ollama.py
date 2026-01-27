@@ -9,24 +9,24 @@ class ChineseFormatter:
     """中文会议逐字稿书面化处理"""
 
     def __init__(self, lm_studio_url: str = "http://127.0.0.1:1234",
-                 model_name: str = "qwen2.5-14b-instruct-1m"):
+                 model_name: str = "qwen2.5-7b-instruct-1m"):
         self.lm_studio_url = lm_studio_url
         self.model_name = model_name
         self.api_endpoint = f"{lm_studio_url}/v1/chat/completions"
 
         # 模型参数配置（优化为精简书面化输出）- LM Studio OpenAI兼容格式
         self.model_options = {
-            # 模型质量参数
-            "temperature": 0.3,  # 降低温度，使输出更简洁规范
-            "top_p": 0.85,  # 降低top-p，减少发散
-            "max_tokens": 8192,  # 限制最大输出，防止过度冗长
-            "presence_penalty": 0.2,  # 提高存在惩罚
-            "frequency_penalty": 0.2,  # 提高频率惩罚
-            "stop": ["\n\n\n", "============", "End of", "【结束】"],  # 添加停止词
-
-            # 思考模式控制（如果模型支持）
-            # "include_reasoning": False,  # 某些模型使用此参数
-            # "reasoning_effort": "none",   # 某些模型使用此参数
+            "num_ctx": 8192,  # 上下文窗口大小
+            "num_predict": 4096,  # 提高最大输出，确保足够篇幅
+            "num_batch": 1024,  # 默认即可，或设为 1024 提升吞吐
+            "temperature": 0.6,  # 降低温度，使输出更稳定
+            "top_p": 0.8,  # 提高top-p，增加内容多样性
+            "top_k": 40,  # 降低top-k，更聚焦
+            "repeat_penalty": 1.08,  # 降低重复惩罚，避免过度精简
+            "presence_penalty": 0,  # 提高存在惩罚
+            "frequency_penalty": 0,  # 提高频率惩罚
+            "rope_frequency_base": 1000000,  # Qwen 长文本适配
+            "stop": ["============", "End of", "【结束】"]  # 移除\n\n\n避免说话人段落间误触发
         }
 
         # 提示词模板
@@ -37,15 +37,15 @@ class ChineseFormatter:
 
     <task>
         <requirement type="core" priority="highest">
-            <title>核心要求 - 逐句转换，不做总结</title>
+            <title>核心要求 - 按说话人分段，连续的同一个说话人只输出一个说话人标签，并把这个说话人的话，逐句转换后合并到一个段落中，不做总结</title>
             <item id="1">
                 <name>逐句转换</name>
                 <rules>
-                    <rule>对原文中的每一句话进行书面化改写，不要无中生有</rule>
+                    <rule>对原文中的每一段进行书面化改写，不要无中生有</rule>
                     <rule>严禁自己总结、概括或归纳，输出的结果请完全依照原文，仅做书面化语句调整</rule>
-                    <rule>输入文本每句话换一行，根据标签区分同一个说话人的内容，输出需根据同一说话人标签整合，把同一个人说的话合并到一个段落，不要单句分行</rule>
+                    <rule>根据标签区分同一个说话人的内容，输出需根据同一说话人标签整合，把同一个人说的话合并到一个段落，不要单句分行</rule>
                     <rule>保留所有说话人的所有发言内容</rule>
-                    <rule>每句话开始有对应的说话人标签，例如【说话人:0】、【说话人:1】等</rule>
+                    <rule>每段开始有对应的说话人标签，例如【说话人:0】、【说话人:1】等</rule>
                     <rule condition="empty_content">如果原文较为口语化，请判断是否有有效内容产出，如果没有有效表达，无需输出</rule>
                     <rule condition="empty_content">例如【说话人:X】：(标签后只有换行符)【说话人:X】：(标签后没内容)的，连标签也不需要输出</rule>
                 </rules>
@@ -58,6 +58,7 @@ class ChineseFormatter:
                     <rule>保留所有实质性内容、数据、观点、讨论细节</rule>
                     <rule>将口语表达改为正式书面语表达</rule>
                     <rule>润色语言，使表达更专业、更规范，精炼措辞，提升专业性和一致性（如"要"替换成"须"）</rule>
+                    <rule>在删除口语冗余词的同时，通过增加逻辑连接词（如"鉴于此"、"综上所述"、"不仅……而且"）和完整的谓语结构，确保信息密度提升的同时，篇幅保持在原文的 70%-80%</rule>
                 </rules>
             </item>
 
@@ -79,6 +80,7 @@ class ChineseFormatter:
                     <requirement>保留原有的对话结构和顺序</requirement>
                     <requirement>每个说话人的发言都要完整保留</requirement>
                     <requirement>语言风格：正式、专业、客观</requirement>
+                    <requirement>百分比用数字表示如"八十二%"的输出应为"82%"</requirement>
                 </requirements>
             </item>
 
@@ -98,7 +100,7 @@ class ChineseFormatter:
                 <formatting_rules>
                     <rule id="speaker_label">
                         <name>说话人标识格式统一</name>
-                        <description>使用【说话人姓名】（书名号），不要用方括号[]</description>
+                        <description>使用【说话人:姓名或序号】</description>
                     </rule>
                     <rule id="paragraph_organization">
                         <name>段落组织</name>
@@ -106,14 +108,14 @@ class ChineseFormatter:
                     </rule>
                     <rule id="line_break">
                         <name>换行规则</name>
-                        <description>每个说话人的完整语义段落结束后，必须换行（每个说话人占一行）</description>
+                        <description>每个说话人的完整语义段落结束后再换行，不要一看到句号就换行</description>
                     </rule>
                     <rule id="sentence_continuity">
-                        <name>不要多句话换行</name>
+                        <name>每个说话人一行，没有切换下一个说话人时，不要换行</name>
                         <description>同一说话人的相关句子应自然衔接，形成流畅段落</description>
                     </rule>
                     <rule id="one_speaker_one_paragraph">
-                        <name>一个说话人=一个段落</name>
+                        <name>一个说话人一个段落</name>
                         <format>【说话人】：完整内容（可包含多个句子）然后换行</format>
                     </rule>
                 </formatting_rules>
@@ -122,25 +124,47 @@ class ChineseFormatter:
             <item id="7">
                 <name>输出示例</name>
                 <examples>
+                    <example type="original_input_text">
+                        <description>假设输入的原文</description>
+                        <content>
+                            【说话人:0】大家还有其他问题吗？
+                            【说话人:0】如果没有问题的话我们进入下一个议题。
+                            【说话人:1】我还有一个问题是关于某某银行目前在销售的内容中。
+                            【说话人:1】与我们公司契合度高的产品。
+                            【说话人:1】有哪些是热销的？
+                            【说话人:2】好的，非常好的问题。
+                            【说话人:2】那么这个问题我来解答。
+                            【说话人:2】是这样的。
+                        </content>
+                    </example>
                     <example type="correct">
                         <description>正确格式</description>
                         <content>
-                            【主持人】：大家好，欢迎参加今天的会议。今天我们主要讨论数据治理的相关工作。
-                            
-                            【张总】：我们需要建立一个完善的数据治理体系。数据治理非常重要，对企业的数字化转型至关重要。
-                            
-                            【李经理】：我同意张总的说法。我们的平台能够提供有效的支持。
+                            【说话人:0】大家还有其他问题吗？如果没有问题的话我们进入下一个议题。
+                            【说话人:1】我还有一个问题是关于某某银行目前在销售的内容中。与我们公司契合度高的产品。有哪些是热销的？
+                            【说话人:2】好的，非常好的问题。那么这个问题我来解答。是这样的。
                         </content>
                     </example>
                     <example type="incorrect">
                         <description>错误格式</description>
                         <errors>
+                            <error>
+                                连续两行输出相同说话人前缀标签是错误的，同一个人的多句话分行输出是错误示例。
+                                【说话人:0】大家还有其他问题吗？
+                                【说话人:0】如果没有问题的话我们进入下一个议题。
+                                【说话人:1】我还有一个问题是关于某某银行目前在销售的内容中，
+                                【说话人:1】与我们公司契合度高的产品。
+                                【说话人:1】有哪些是热销的？
+                                【说话人:2】好的，非常好的问题。
+                                【说话人:2】那么这个问题我来解答。
+                                【说话人:2】是这样的。
+                            </error>
                             <error>【主持人】：大家好，【张总】：我们需要建立...（不要把不同说话人放在一起）</error>
                             <error>【主持人】：大家好。今天我们讨论。相关的工作。（同一说话人的相关句子不要断开）</error>
                         </errors>
                     </example>
                 </examples>
-                <core_principle>逐句书面化改写，不删不减，保留说话人，一个说话人一个段落！</core_principle>
+                <core_principle>保留说话人，一个说话人一个段落！</core_principle>
             </item>
         </requirement>
     </task>
@@ -159,11 +183,17 @@ class ChineseFormatter:
             <value>{target_length}</value>
             <tolerance>±10%</tolerance>
         </target_length>
+        <target_ratio>
+            <minimum>70%</minimum>
+            <maximum>80%</maximum>
+            <description>输出篇幅必须达到原文的70%-80%，删除口语词后需通过增加逻辑连接词补充篇幅</description>
+        </target_ratio>
         <format>严格按照上述示例格式，直接输出逐句书面化改写后的对话</format>
         <special_requirements>
             <requirement priority="critical">严禁输出思考过程、推理步骤或中间分析</requirement>
             <requirement priority="critical">直接输出最终结果，不要有任何前缀、说明或思考内容</requirement>
             <requirement>不要使用"让我分析"、"首先"、"接下来"等表达思考过程的词语</requirement>
+            <requirement priority="high">输出内容必须完整，不能中途停止，直到处理完所有说话人内容</requirement>
         </special_requirements>
     </output_requirement>
 </instructions>"""
@@ -437,11 +467,36 @@ class ChineseFormatter:
             **self.model_options
         }
 
+        # 针对重复的重试计数（独立于网络错误重试）
+        repetition_retries = 0
+        max_repetition_retries = 2  # 最多重试2次（总共3次机会）
+
         for attempt in range(max_retries + 1):
             try:
                 if use_stream:
                     # 使用流式输出，实时监控生成进度
-                    return self._stream_response(payload, attempt)
+                    response_text, needs_retry = self._stream_response(payload, attempt)
+
+                    # 如果检测到重复，进行重试
+                    if needs_retry and repetition_retries < max_repetition_retries:
+                        repetition_retries += 1
+                        print(f"  🔄 因内容重复进行第{repetition_retries}次重新生成...")
+                        # 稍微调整temperature以增加随机性
+                        adjusted_payload = payload.copy()
+                        adjusted_payload["temperature"] = self.model_options["temperature"] + (0.1 * repetition_retries)
+                        continue  # 重新调用
+
+                    # 如果有结果或已达到最大重试次数，返回结果
+                    if response_text:
+                        return response_text
+                    elif attempt < max_retries or repetition_retries > 0:
+                        # 如果还有重试机会（包括重复重试），继续
+                        if repetition_retries >= max_repetition_retries:
+                            print(f"  ⚠️ 已达到最大重复重试次数，放弃该片段")
+                            return ""
+                        continue
+                    else:
+                        return ""
                 else:
                     # 非流式模式
                     response = requests.post(
@@ -477,16 +532,16 @@ class ChineseFormatter:
 
         return ""
 
-    def _stream_response(self, payload: dict, attempt: int) -> str:
+    def _stream_response(self, payload: dict, attempt: int) -> tuple[str, bool]:
         """
-        流式响应处理（LM Studio OpenAI兼容格式），智能检测重复并停止
+        流式响应处理（LM Studio OpenAI兼容格式），智能检测重复
 
         Args:
             payload: 请求payload
             attempt: 当前尝试次数
 
         Returns:
-            模型生成的文本
+            (模型生成的文本, 是否因重复而需要重试)
         """
         import time
 
@@ -555,9 +610,10 @@ class ChineseFormatter:
                         # 智能重复检测：每生成一定字符后检查
                         if len(response_text) - last_check_length >= repetition_check_interval:
                             if self.detect_repetition(response_text):
-                                print(f"\n  🔄 检测到内容重复，自动停止")
+                                print(f"\n  🔄 检测到内容重复，标记需重新生成")
                                 print(f"  📊 已生成 {len(response_text)} 字符")
-                                break
+                                # 返回空文本和True表示需要重试
+                                return ("", True)
                             last_check_length = len(response_text)
 
                     except json.JSONDecodeError:
@@ -567,19 +623,19 @@ class ChineseFormatter:
             response_text = response_text.strip()
             if not response_text and attempt < 2:
                 print(f"\n  ⚠️ 第{attempt + 1}次流式请求返回空结果，重试中...")
-                return ""
+                return ("", False)
             elif not response_text:
                 print(f"\n  ❌ 多次重试仍返回空结果")
-                return ""
+                return ("", False)
 
-            return response_text
+            return (response_text, False)
 
         except requests.exceptions.Timeout:
             print(f"\n  ⏱️ 流式请求超时")
-            return ""
+            return ("", False)
         except Exception as e:
             print(f"\n  ❌ 流式处理出错: {e}")
-            return ""
+            return ("", False)
 
     def process_transcript(self, transcript: str) -> str:
         """
@@ -598,7 +654,7 @@ class ChineseFormatter:
         # 分割文本（使用1000字符片段，方便精简）
         chunks = self.split_text(transcript, max_chars=1000)
         print(f"文本已分割成 {len(chunks)} 个片段 (每段约1000字符)")
-        print(f"预期输出篇幅: {int(len(transcript) * 0.8)}-{int(len(transcript) * 0.9)} 字符 (原文80%-90%)")
+        print(f"预期输出篇幅: {int(len(transcript) * 0.7)}-{int(len(transcript) * 0.8)} 字符 (原文70%-80%)")
 
         processed_chunks = []
         total_output_length = 0
@@ -606,8 +662,8 @@ class ChineseFormatter:
 
         for i, chunk in enumerate(chunks, 1):
             chunk_length = len(chunk)
-            target_length_min = int(chunk_length * 0.8)
-            target_length_max = int(chunk_length * 0.9)
+            target_length_min = int(chunk_length * 0.7)
+            target_length_max = int(chunk_length * 0.8)
 
             print(f"\n[{i}/{len(chunks)}] 处理中... (输入: {chunk_length} 字符, 目标: {target_length_min}-{target_length_max} 字符)", end=" ")
 
@@ -653,10 +709,10 @@ class ChineseFormatter:
                     print(f"✓ 输出: {len(result)} 字符 ({result_ratio:.1f}%)")
 
                     # 评价比例
-                    if 80 <= result_ratio <= 90:
+                    if 70 <= result_ratio <= 80:
                         print(f"    ✓ 理想比例")
-                    elif result_ratio < 70:
-                        print(f"    ⚠️ 警告: 仍未达到目标比例 (目标: 80%-90%)")
+                    elif result_ratio < 60:
+                        print(f"    ⚠️ 警告: 仍未达到目标比例 (目标: 70%-80%)")
                     elif result_ratio > 100:
                         print(f"    ⚠️ 警告: 输出偏多 (已去重)")
                     else:
@@ -680,14 +736,14 @@ class ChineseFormatter:
         print(f"精简书面化完成统计:")
         print(f"  原文总长: {len(transcript)} 字符")
         print(f"  输出总长: {total_output_length} 字符 ({overall_ratio:.1f}%)")
-        print(f"  目标比例: 80%-90%")
+        print(f"  目标比例: 70%-80%")
         print(f"  去重次数: {dedup_count} 个segments")
 
-        if overall_ratio < 70:
+        if overall_ratio < 60:
             print(f"  ⚠️ 注意: 输出偏少，可能信息丢失")
         elif overall_ratio > 100:
             print(f"  ⚠️ 注意: 输出偏多，不够精简")
-        elif 80 <= overall_ratio <= 90:
+        elif 70 <= overall_ratio <= 80:
             print(f"  ✓ 达到理想比例")
         else:
             print(f"  ✓ 基本达标")
@@ -721,10 +777,7 @@ class ChineseFormatter:
 # 使用示例
 if __name__ == "__main__":
     # 初始化处理器
-    formatter = ChineseFormatter(
-        lm_studio_url="http://127.0.0.1:1234",
-        model_name="qwen2.5-14b-instruct-1m"
-    )
+    formatter = ChineseFormatter()
 
     # 读取输入文件
     print("读取会议逐字稿...")
