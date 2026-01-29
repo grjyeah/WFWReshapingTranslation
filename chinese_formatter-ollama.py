@@ -633,6 +633,50 @@ class ChineseFormatter:
 
         return processed_text
 
+    def merge_consecutive_turns(self, text: str) -> str:
+        """
+        修正后的逻辑：仅合并连续（相邻）的相同说话人。
+        保留对话的原始先后顺序。
+        """
+        lines = text.split('\n')
+        if not lines:
+            return ""
+
+        merged_turns = []
+        current_speaker = None
+        current_content = ""
+
+        # 匹配模式：【说话人:XX】内容
+        pattern = re.compile(r'^【([^】]+)】(.*)')
+
+        for line in lines:
+            line = line.strip()
+            if not line: continue
+
+            match = pattern.match(line)
+            if match:
+                speaker_name, content = match.groups()
+
+                # 如果当前行说话人与上一行相同，则合并内容（不加换行）
+                if speaker_name == current_speaker:
+                    current_content += content
+                else:
+                    # 说话人变了，先保存上一轮的完整对话
+                    if current_speaker is not None:
+                        merged_turns.append(f"【{current_speaker}】{current_content}")
+                    # 开启新的一轮
+                    current_speaker = speaker_name
+                    current_content = content
+            else:
+                # 如果某行没标签，视为上一行的延续
+                current_content += line
+
+        # 别忘了添加最后一段
+        if current_speaker is not None:
+            merged_turns.append(f"【{current_speaker}】{current_content}")
+
+        return '\n'.join(merged_turns)
+
     def _generate_timestamped_filename(self, base_name: str) -> str:
         """
         生成带时间戳的文件名
@@ -671,6 +715,9 @@ if __name__ == "__main__":
 
         # 处理文本
         processed_chinese = formatter.process_transcript(transcript)
+
+        # 后处理合并说话人
+        processed_chinese = formatter.merge_consecutive_turns(processed_chinese)
 
         # 生成带时间戳的文件名
         chinese_filename = formatter._generate_timestamped_filename("processed_chinese.txt")
