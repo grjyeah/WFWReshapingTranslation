@@ -11,14 +11,12 @@ import xml.etree.ElementTree as ET
 class EnglishTranslator:
     """中文会议纪要翻译成英文"""
 
-    def __init__(self, ollama_url: str = "http://localhost:11434",
-                 # model_name: str = "yasserrmd/Qwen2.5-7B-Instruct-1M:latest"):
-                 model_name: str = "did100/qwen2.5-32B-Instruct-Q4_K_M:latest"):
-                 # model_name: str = "alibayram/Qwen3-30B-A3B-Instruct-2507:latest"),
+    def __init__(self, lm_studio_url: str = "http://127.0.0.1:1234",
+                 model_name: str = "qwen2.5-7b-instruct-1m",
                  prompt_xml_path: str = None):
-        self.ollama_url = ollama_url
+        self.lm_studio_url = lm_studio_url
         self.model_name = model_name
-        self.api_endpoint = f"{ollama_url}/api/generate"
+        self.api_endpoint = f"{lm_studio_url}/v1/chat/completions"
 
         # 从XML文件加载提示词
         if prompt_xml_path is None:
@@ -30,22 +28,16 @@ class EnglishTranslator:
 
         # 模型参数配置（优化为精简书面化输出）
         self.model_options = {
-            "mirostat": 2,
-            "mirostat_tau": 3.5,  # 中 → 英翻译 / 中英混合输出，降低随机性，提升术语一致性与语法正确性
-            "mirostat_eta": 0.1,
-            "repeat_penalty": 1.1,
-            "num_thread": 8,  # GPU offload 后，CPU 只需处理剩余层，8 线程足够
-            "num_batch": 512,  # 默认即可，或设为 1024 提升吞吐
-            "rope_frequency_base": 1000000,  # Qwen 长文本适配
-
-            "num_ctx": 131072,  # 上下文窗口大小
+            "num_ctx": 8192,  # 上下文窗口大小
             "num_predict": 8192,  # 限制最大输出，防止过度冗长
+            "num_batch": 1024,  # 默认即可，或设为 1024 提升吞吐
             "temperature": 0.5,  # 降低温度，使输出更简洁规范
             "top_p": 0.85,  # 降低top-p，减少发散
             "top_k": 30,  # 降低top-k，更聚焦
             "repeat_penalty": 1.15,  # 提高重复惩罚，避免啰嗦
             "presence_penalty": 0.2,  # 提高存在惩罚
             "frequency_penalty": 0.2,  # 提高频率惩罚
+            "rope_frequency_base": 1000000,  # Qwen 长文本适配
             "stop": ["\n\n\n", "============", "End of", "【结束】"]  # 添加停止词
         }
 
@@ -207,12 +199,14 @@ class EnglishTranslator:
         Returns:
             模型生成的文本
         """
+        # 使用OpenAI兼容格式（LM Studio）
         payload = {
             "model": self.model_name,
-            "prompt": prompt,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
             "stream": use_stream,
-            "options": self.model_options,
-            "num_gpu_layers": 60  # 根据你的GPU显存调整数值
+            **self.model_options
         }
 
         for attempt in range(max_retries + 1):
@@ -458,10 +452,7 @@ class EnglishTranslator:
 # 使用示例
 if __name__ == "__main__":
     # 初始化翻译器
-    translator = EnglishTranslator(
-        ollama_url="http://localhost:11434",
-        model_name="yasserrmd/Qwen2.5-7B-Instruct-1M:latest"
-    )
+    translator = EnglishTranslator()
 
     try:
         # 自动查找最新的 processed_chinese 文件
