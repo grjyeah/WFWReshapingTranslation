@@ -13,7 +13,8 @@ class EnglishTranslator:
 
     def __init__(self, lm_studio_url: str = "http://127.0.0.1:1234",
                  model_name: str = "qwen2.5-7b-instruct-1m",
-                 prompt_xml_path: str = None):
+                 prompt_xml_path: str = None,
+                 hotword_dir: str = None):
         self.lm_studio_url = lm_studio_url
         self.model_name = model_name
         self.api_endpoint = f"{lm_studio_url}/v1/chat/completions"
@@ -25,6 +26,13 @@ class EnglishTranslator:
             prompt_xml_path = os.path.join(current_dir, "formatted_prompt_templates", "english_translator_prompt.xml")
 
         self.translation_prompt = self._load_prompt_from_xml(prompt_xml_path)
+
+        # 加载热词表
+        if hotword_dir is None:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            hotword_dir = os.path.join(current_dir, "hotword")
+
+        self.hotword_dict = self._load_hotwords(hotword_dir)
 
         # 模型参数配置（优化为精简书面化输出）
         self.model_options = {
@@ -80,6 +88,98 @@ class EnglishTranslator:
             )
         except Exception as e:
             raise Exception(f"加载提示词模板出错: {e}")
+
+    def _load_hotwords(self, hotword_dir: str) -> dict:
+        """
+        从hotword目录加载热词表
+
+        Args:
+            hotword_dir: 热词目录路径
+
+        Returns:
+            热词字典 {中文: 英文}
+        """
+        hotword_dict = {}
+
+        # 确保目录存在
+        if not os.path.exists(hotword_dir):
+            print(f"  [WARN] 热词目录不存在: {hotword_dir}")
+            return hotword_dict
+
+        # 查找所有txt文件
+        txt_files = glob.glob(os.path.join(hotword_dir, "*.txt"))
+
+        if not txt_files:
+            print(f"  [WARN] 热词目录中没有找到txt文件: {hotword_dir}")
+            return hotword_dict
+
+        # 读取所有热词文件
+        for txt_file in txt_files:
+            try:
+                with open(txt_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                # 解析热词（空格分隔，中英文对照）
+                tokens = content.split()
+                i = 0
+                while i < len(tokens):
+                    token = tokens[i].strip()
+                    if not token:
+                        i += 1
+                        continue
+
+                    # 判断是否为中文（包含中文字符）
+                    if any('\u4e00' <= ch <= '\u9fff' for ch in token):
+                        chinese = token
+                        # 查找后续的英文翻译
+                        english_parts = []
+                        i += 1
+                        while i < len(tokens):
+                            next_token = tokens[i].strip()
+                            # 如果遇到新的中文或特殊标记，停止
+                            if not next_token:
+                                i += 1
+                                continue
+                            if any('\u4e00' <= ch <= '\u9fff' for ch in next_token):
+                                break
+                            # 是英文或其他非中文内容
+                            english_parts.append(next_token)
+                            i += 1
+
+                        if english_parts:
+                            english = " ".join(english_parts)
+                            hotword_dict[chinese] = english
+                    else:
+                        i += 1
+
+                print(f"  [INFO] 已加载热词文件: {os.path.basename(txt_file)}")
+
+            except Exception as e:
+                print(f"  [WARN] 加载热词文件失败 {txt_file}: {e}")
+
+        print(f"  [INFO] 共加载 {len(hotword_dict)} 个热词")
+        return hotword_dict
+
+    def _format_hotwords_for_prompt(self) -> str:
+        """
+        将热词字典格式化为提示词格式
+
+        Returns:
+            格式化的热词表字符串
+        """
+        if not self.hotword_dict:
+            return ""
+
+        # 按中文词长度排序（长的在前，优先匹配）
+        sorted_items = sorted(self.hotword_dict.items(), key=lambda x: len(x[0]), reverse=True)
+
+        # 格式化为列表
+        lines = ["<hotword_table>"]
+        for chinese, english in sorted_items:
+            lines.append(f"  {chinese} -> {english}")
+        lines.append("</hotword_table>")
+
+        return "\n".join(lines)
 
     def split_text(self, text: str, max_chars: int = 1500) -> List[str]:
         """
@@ -402,8 +502,20 @@ class EnglishTranslator:
         for i, chunk in enumerate(chunks, 1):
             print(f"[{i}/{len(chunks)}] 翻译中... (输入: {len(chunk)} 字符)", end=" ")
 
-            # 构建翻译提示词
-            prompt = self.translation_prompt.format(text=chunk)
+            # 构建热词表
+            hotword_table = self._format_hotwords_for_prompt()
+
+            # 构建翻译提示词（代入热词表）
+            if hotword_table:
+                # 提示词模板支持热词表
+                try:
+                    prompt = self.translation_prompt.format(text=chunk, hotwords=hotword_table)
+                except KeyError:
+                    # 提示词模板没有热词占位符，使用原方式
+                    prompt = self.translation_prompt.format(text=chunk)
+            else:
+                # 没有热词表
+                prompt = self.translation_prompt.format(text=chunk)
 
             # 调用模型
             result = self.call_ollama(prompt)

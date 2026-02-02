@@ -43,3 +43,4 @@ processed_backup/
 input_scripts/
 /audio_preprocessing/temp_uploads/
 /audio_preprocessing/nul
+/hotword/
