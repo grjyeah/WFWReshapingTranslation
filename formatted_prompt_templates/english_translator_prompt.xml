@@ -57,7 +57,7 @@
                         <prohibition>严禁添加翻译注释或脚注</prohibition>
                         <prohibition>严禁添加"以下是翻译结果"等引导语</prohibition>
                         <prohibition>严禁添加"翻译完成"、"翻译如下"等总结语</prohibition>
-                        <prohibition priority="critical">只输出翻译后的英文对话，不要有任何其他文字</prohibition>
+                        <prohibition priority="critical">只输出翻译后的英文对话，不要有任何其他文字，不要有粗话脏话等违反伦理的内容</prohibition>
                     </prohibitions>
                 </item>
 

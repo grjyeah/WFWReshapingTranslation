@@ -38,7 +38,7 @@ class EnglishTranslator:
             "presence_penalty": 0.2,  # 提高存在惩罚
             "frequency_penalty": 0.2,  # 提高频率惩罚
             "rope_frequency_base": 1000000,  # Qwen 长文本适配
-            "stop": ["\n\n\n", "============", "End of", "【结束】"]  # 添加停止词
+            "stop": ["============", "End of", "【结束】"]  # 添加停止词
         }
 
     def _load_prompt_from_xml(self, xml_path: str) -> str:
@@ -285,9 +285,44 @@ class EnglishTranslator:
 
             for line in response.iter_lines():
                 if line:
+                    # 跳过空行
+                    line_str = line.decode('utf-8').strip()
+                    if not line_str:
+                        continue
+
+                    # 移除 "data: " 前缀（OpenAI格式）
+                    if line_str.startswith('data: '):
+                        line_str = line_str[6:]
+
+                    # 跳过 [DONE] 标记（OpenAI格式）
+                    if line_str == '[DONE]':
+                        break
+
                     try:
-                        data = json.loads(line)
-                        if 'response' in data:
+                        data = json.loads(line_str)
+
+                        # 支持OpenAI格式 (choices[0].delta.content)
+                        if 'choices' in data and len(data['choices']) > 0:
+                            delta = data['choices'][0].get('delta', {})
+                            if 'content' in delta:
+                                content = delta['content']
+                                if content:  # content可能为None
+                                    response_text += content
+                                    last_output_time = time.time()
+                                    no_output_count = 0
+
+                                    # 每1000个字符显示一个点
+                                    if len(response_text) % 1000 < 50:
+                                        print(".", end="", flush=True)
+
+                            # 检查是否完成（OpenAI格式使用finish_reason）
+                            finish_reason = data['choices'][0].get('finish_reason')
+                            if finish_reason is not None:
+                                print("] ", end="", flush=True)
+                                break
+
+                        # 支持Ollama格式 (response字段)
+                        elif 'response' in data:
                             response_text += data['response']
                             last_output_time = time.time()
                             no_output_count = 0
@@ -296,7 +331,7 @@ class EnglishTranslator:
                             if len(response_text) % 1000 < 50:
                                 print(".", end="", flush=True)
 
-                        # 检查是否完成
+                        # 检查是否完成（Ollama格式使用done字段）
                         if data.get('done', False):
                             print("] ", end="", flush=True)
                             break
@@ -377,9 +412,9 @@ class EnglishTranslator:
                 translated_chunks.append(result)
                 total_output_length += len(result)
                 ratio = len(result) / len(chunk) * 100
-                print(f"✓ 输出: {len(result)} 字符 ({ratio:.1f}%)")
+                print(f"[OK] 输出: {len(result)} 字符 ({ratio:.1f}%)")
             else:
-                print(f"✗ 翻译失败")
+                print(f"[FAIL] 翻译失败")
                 # 翻译失败时保留原文（虽然不理想，但不会丢失内容）
                 translated_chunks.append(chunk)
                 total_output_length += len(chunk)

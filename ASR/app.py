@@ -124,6 +124,27 @@ def postprocess_sensevoice_result(text: str) -> str:
     return result
 
 
+def format_timestamp(milliseconds: float) -> str:
+    """将毫秒转换为"X时X分X秒"格式
+
+    Args:
+        milliseconds: 毫秒数
+
+    Returns:
+        格式化后的时间字符串，如"0时22分44秒"
+    """
+    if milliseconds == 0:
+        return "0时0分0秒"
+
+    total_seconds = milliseconds / 1000
+
+    hours = int(total_seconds // 3600)
+    minutes = int((total_seconds % 3600) // 60)
+    seconds = int(total_seconds % 60)
+
+    return f"{hours}时{minutes}分{seconds}秒"
+
+
 class FunASRWebUI:
     def __init__(self):
         self.setup_environment()
@@ -530,69 +551,50 @@ class FunASRWebUI:
                     )
 
                 with gr.Column(scale=3, min_width=600):
-                    # 结果显示区域（改进标签页）
-                    result_tabs = gr.Tabs()
+                    # 结果显示区域（只保留说话人分离标签页）
+                    with gr.Group():
+                        gr.Markdown("### 👥 说话人分离结果")
 
-                    with result_tabs:
-                        with gr.TabItem("📝 文本结果"):
-                            text_result_adv = gr.Textbox(
-                                label="识别文本",
-                                lines=8,
-                                placeholder="识别结果...",
-                                max_lines=20,
-                                interactive=False,
-                                container=True
-                            )
+                        speaker_result = gr.Dataframe(
+                            headers=["说话人", "开始时间", "结束时间", "文本"],
+                            label="说话人分离结果",
+                            interactive=False
+                        )
 
-                        with gr.TabItem("⏰ 时间戳"):
-                            timestamp_result = gr.Dataframe(
-                                headers=["开始时间", "结束时间", "文本"],
-                                label="时间戳信息",
-                                interactive=False
-                            )
+                        # 一键复制功能
+                        with gr.Row():
+                            copy_btn = gr.Button(" 一键复制表格", variant="primary")
 
-                        with gr.TabItem("👥 说话人分离"):
-                            speaker_result = gr.Dataframe(
-                                headers=["说话人", "开始时间", "结束时间", "文本"],
-                                label="说话人分离结果",
-                                interactive=False
-                            )
+                        export_output = gr.Textbox(
+                            label="复制结果",
+                            lines=5,
+                            show_copy_button=True  # 这个属性会显示复制按钮
+                        )
 
-                            # 一键复制功能
-                            with gr.Row():
-                                copy_btn = gr.Button(" 一键复制表格", variant="primary")
+                        def copy_speaker_results(speaker_data):
+                            if speaker_data is None or speaker_data.empty:
+                                return "没有数据可复制"
 
-                            export_output = gr.Textbox(
-                                label="复制结果",
-                                lines=5,
-                                show_copy_button=True  # 这个属性会显示复制按钮
-                            )
+                            # 使用制表符分隔的格式，方便Excel自动分列
+                            text = "说话人\t开始时间\t结束时间\t文本内容\n"
 
-                            def copy_speaker_results(speaker_data):
-                                if speaker_data is None or speaker_data.empty:
-                                    return "没有数据可复制"
+                            for index, row in speaker_data.iterrows():
+                                speaker = str(row['说话人']).replace('\t', ' ')
+                                start_time = str(row['开始时间']).replace('\t', ' ')
+                                end_time = str(row['结束时间']).replace('\t', ' ')
+                                # 文本列已经包含【说话人X】标签，直接使用即可
+                                content = str(row['文本']).replace('\t', ' ').replace('\n', ' ')
 
-                                # 使用制表符分隔的格式，方便Excel自动分列
-                                text = "说话人\t开始时间\t结束时间\t文本内容\n"
+                                text += f"{speaker}\t{start_time}\t{end_time}\t{content}\n"
 
-                                for index, row in speaker_data.iterrows():
-                                    speaker = str(row['说话人']).replace('\t', ' ')
-                                    start_time = str(row['开始时间']).replace('\t', ' ')
-                                    end_time = str(row['结束时间']).replace('\t', ' ')
-                                    # 文本列已经包含【说话人X】标签，直接使用即可
-                                    content = str(row['文本']).replace('\t', ' ').replace('\n', ' ')
+                            return text
 
-                                    text += f"{speaker}\t{start_time}\t{end_time}\t{content}\n"
+                        copy_btn.click(copy_speaker_results, inputs=[speaker_result], outputs=[export_output])
 
-                                return text
-
-                            copy_btn.click(copy_speaker_results, inputs=[speaker_result], outputs=[export_output])
-
-                        with gr.TabItem("📊 完整结果"):
-                            full_result_adv = gr.JSON(
-                                label="完整结果",
-                                container=True
-                            )
+                    # 隐藏的输出组件（用于保持API兼容性）
+                    text_result_adv = gr.Textbox(visible=False)
+                    timestamp_result = gr.Dataframe(visible=False)
+                    full_result_adv = gr.JSON(visible=False)
 
                     # 状态信息（放在标签页下方）
                     status_adv = gr.Textbox(
@@ -718,8 +720,8 @@ class FunASRWebUI:
                     if capabilities["supports_timestamp"] and "timestamp" in result and result["timestamp"]:
                         timestamp_data = []
                         for ts in result["timestamp"]:
-                            start_time = f"{ts[0] / 1000:.2f}s"
-                            end_time = f"{ts[1] / 1000:.2f}s"
+                            start_time = format_timestamp(ts[0])
+                            end_time = format_timestamp(ts[1])
                             word = ts[2] if len(ts) > 2 else ""
                             timestamp_data.append([start_time, end_time, word])
                         timestamp_df = pd.DataFrame(timestamp_data, columns=["开始时间", "结束时间", "文本"])
@@ -734,8 +736,8 @@ class FunASRWebUI:
                         speaker_data = []
                         for sent in result["sentence_info"]:
                             speaker = sent.get("spk", "未知")
-                            start_time = f"{sent.get('start', 0) / 1000:.2f}s"
-                            end_time = f"{sent.get('end', 0) / 1000:.2f}s"
+                            start_time = format_timestamp(sent.get('start', 0))
+                            end_time = format_timestamp(sent.get('end', 0))
                             sentence = sent.get("sentence", "")
                             if not sentence:
                                 sentence = sent.get("text", "")
@@ -1345,12 +1347,14 @@ class FunASRWebUI:
             </div>
             """)
 
-            with gr.Tabs() as tabs:
+            # 只显示高级功能标签页，其他标签页隐藏
+            with gr.Column():
+                self.create_advanced_interface()
+
+            # 隐藏的标签页（用于保持API兼容性，但不显示）
+            with gr.Tabs(visible=False) as tabs:
                 with gr.TabItem("🎤 基础识别", id="basic"):
                     self.create_basic_asr_interface()
-
-                with gr.TabItem("⚙️ 高级功能", id="advanced"):
-                    self.create_advanced_interface()
 
                 with gr.TabItem("📁 批量处理", id="batch"):
                     self.create_batch_interface()
@@ -1364,11 +1368,7 @@ class FunASRWebUI:
             gr.Markdown("""
             ---
             ### 📖 使用说明
-            - **基础识别**: 简单快速的语音识别，支持文件上传和实时录音
             - **高级功能**: 包含VAD、标点恢复、说话人分离、时间戳等功能
-            - **批量处理**: 一次性处理多个音频文件
-            - **模型管理**: 查看已下载模型，管理缓存空间
-            - **系统设置**: 配置环境参数，查看系统状态
 
             💡 **提示**: 首次使用需要下载模型，请耐心等待
             """)
