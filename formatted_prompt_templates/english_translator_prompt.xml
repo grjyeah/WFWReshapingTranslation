@@ -53,6 +53,7 @@
                 <item id="4" type="prohibition">
                     <name>输出规范</name>
                     <prohibitions>
+                        <prohibition>严禁输出中文</prohibition>
                         <prohibition>严禁添加任何额外说明或解释</prohibition>
                         <prohibition>严禁添加翻译注释或脚注</prohibition>
                         <prohibition>严禁添加"以下是翻译结果"等引导语</prohibition>
