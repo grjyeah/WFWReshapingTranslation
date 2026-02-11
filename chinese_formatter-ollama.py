@@ -80,6 +80,70 @@ class ChineseFormatter:
         except Exception as e:
             raise Exception(f"加载提示词模板出错: {e}")
 
+    def is_english_sentence(self, text: str) -> bool:
+        """
+        判断文本是否主要为英文内容
+
+        Args:
+            text: 待检测文本
+
+        Returns:
+            True如果主要是英文，False如果包含中文
+        """
+        # 去除说话人标签
+        text = re.sub(r'【说话人:\d+】', '', text).strip()
+
+        if not text:
+            return False
+
+        # 检查是否包含中文字符
+        chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+        total_chars = len(text)
+
+        # 如果中文字符占比大于5%，认为是中英文混合或中文
+        if total_chars > 0 and chinese_chars / total_chars > 0.05:
+            return False
+
+        # 检查英文字母和常见英文单词占比
+        english_chars = len(re.findall(r'[a-zA-Z]', text))
+        if total_chars > 0 and english_chars / total_chars > 0.3:
+            return True
+
+        return False
+
+    def remove_english_sentences(self, text: str) -> str:
+        """
+        移除主要为英文的句子行，保留说话人标签和中文内容
+
+        Args:
+            text: 原始文本
+
+        Returns:
+            移除英文句子后的文本
+        """
+        lines = text.split('\n')
+        filtered_lines = []
+
+        for line in lines:
+            # 提取说话人标签和内容
+            match = re.match(r'(【说话人:\d+】)\s*(.*)', line)
+            if match:
+                speaker_tag = match.group(1)
+                content = match.group(2).strip()
+
+                # 检查内容是否主要为英文
+                if self.is_english_sentence(content):
+                    continue  # 跳过英文行
+
+                # 保留中文或中英文混合行
+                filtered_lines.append(line)
+            else:
+                # 保留非说话人标签行（如空行、标题等）
+                filtered_lines.append(line)
+
+        result = '\n'.join(filtered_lines)
+        return result
+
     def split_text(self, text: str, max_chars: int = 1000) -> List[str]:
         """
         将长文本按段落智能分割，确保在句子边界切分
@@ -529,6 +593,36 @@ class ChineseFormatter:
         Returns:
             处理后的会议纪要
         """
+        # 步骤0: 英文预处理
+        print(f"\n{'=' * 60}")
+        print("步骤0: 英文预处理")
+        print(f"{'=' * 60}")
+
+        original_length = len(transcript)
+        preprocessed = self.remove_english_sentences(transcript)
+        removed_length = original_length - len(preprocessed)
+
+        if removed_length > 0:
+            print(f"✓ 已移除 {removed_length} 字符的英文内容")
+            print(f"  原始长度: {original_length} 字符")
+            print(f"  预处理后: {len(preprocessed)} 字符")
+
+            # 保存预处理副本用于核验（保存到processed目录）
+            processed_dir = "processed"
+            os.makedirs(processed_dir, exist_ok=True)
+            preprocessed_filename = os.path.join(processed_dir, self._generate_timestamped_filename("preprocessed_no_english.txt"))
+            try:
+                with open(preprocessed_filename, 'w', encoding='utf-8') as f:
+                    f.write(preprocessed)
+                print(f"  ✓ 预处理副本已保存: {preprocessed_filename}")
+            except Exception as e:
+                print(f"  ⚠ 保存预处理副本失败: {e}")
+        else:
+            print("未检测到英文句子，跳过预处理")
+
+        # 使用预处理后的文本进行后续处理
+        transcript = preprocessed
+
         print(f"\n{'=' * 60}")
         print("步骤1: 精简书面化处理")
         print(f"{'=' * 60}")

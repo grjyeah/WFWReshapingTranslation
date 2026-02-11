@@ -3,26 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音频预处理 - RTX 5090加速</title>
+    <title>GPU音频预处理 - RTX 5090加速</title>
     <script src="/static/tailwind.js"></script>
     <style>
-        /* 自定义样式 */
+        /* 黑色主题 - 参考 Gradio 风格 */
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1e 100%);
+            min-height: 100vh;
+        }
+
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .card-shadow {
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.15);
+            background: rgba(30, 30, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        /* 深色卡片背景 */
+        .bg-white {
+            background: rgba(30, 30, 46, 0.95) !important;
+        }
+
+        /* 深色文字 */
+        .text-gray-800, .text-gray-700, .text-gray-600 {
+            color: #e0e0e0 !important;
+        }
+
+        .text-gray-500 {
+            color: #a0a0a0 !important;
+        }
+
+        .text-gray-400 {
+            color: #888888 !important;
+        }
+
+        /* 标题文字白色 */
+        h1, h2, h3, h4, h5, h6 {
+            color: #ffffff !important;
+        }
+
+        /* 标题容器文字白色 */
+        .text-xl {
+            color: #ffffff !important;
+        }
+
+        .text-xl .text-indigo-600 {
+            color: #818cf8 !important;
         }
 
         .upload-zone {
-            border: 2px dashed #cbd5e0;
+            border: 2px dashed rgba(102, 126, 234, 0.4);
+            background: rgba(20, 20, 35, 0.6);
             transition: all 0.3s ease;
         }
 
         .upload-zone:hover, .upload-zone.dragover {
             border-color: #667eea;
-            background-color: #f7fafc;
+            background-color: rgba(102, 126, 234, 0.1);
         }
 
         .progress-bar {
@@ -50,7 +91,7 @@
             width: 100%;
             height: 8px;
             border-radius: 4px;
-            background: #e2e8f0;
+            background: rgba(102, 126, 234, 0.3);
             outline: none;
         }
 
@@ -60,13 +101,15 @@
             width: 20px;
             height: 20px;
             border-radius: 50%;
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             cursor: pointer;
             transition: all 0.2s;
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.5);
         }
 
         input[type="range"]::-webkit-slider-thumb:hover {
             transform: scale(1.2);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.7);
         }
 
         /* 成功/错误提示动画 */
@@ -87,18 +130,20 @@
 
         /* 输出格式选择器样式 */
         .output-format-option {
-            border-color: #e5e7eb;
+            border-color: rgba(102, 126, 234, 0.3);
+            background: rgba(25, 25, 40, 0.8);
             transition: all 0.2s ease;
         }
 
         .output-format-option:hover {
             border-color: #667eea;
-            background-color: #f7fafc;
+            background-color: rgba(102, 126, 234, 0.15);
         }
 
         .output-format-option.selected-format {
             border-color: #667eea;
-            background-color: #eef2ff;
+            background-color: rgba(102, 126, 234, 0.2);
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.3);
         }
 
         .format-check {
@@ -108,9 +153,138 @@
         .output-format-option.selected-format .format-check {
             display: block;
         }
+
+        /* 深色主题额外样式 */
+        .border-gray-200 {
+            border-color: rgba(102, 126, 234, 0.2) !important;
+        }
+
+        .border-gray-300 {
+            border-color: rgba(102, 126, 234, 0.3) !important;
+        }
+
+        /* 提示框深色背景 */
+        .bg-blue-50 {
+            background: rgba(59, 130, 246, 0.1) !important;
+            border-color: rgba(59, 130, 246, 0.3) !important;
+        }
+
+        .bg-orange-50 {
+            background: rgba(249, 115, 22, 0.1) !important;
+            border-color: rgba(249, 115, 22, 0.3) !important;
+        }
+
+        .bg-green-50 {
+            background: rgba(34, 197, 94, 0.1) !important;
+            border-color: rgba(34, 197, 94, 0.3) !important;
+        }
+
+        .bg-gray-100 {
+            background: rgba(30, 30, 46, 0.8) !important;
+        }
+
+        /* 页脚深色背景 */
+        .bg-gray-800 {
+            background: rgba(15, 15, 30, 0.95) !important;
+        }
+
+        /* 响应式设计 - 参考 Gradio */
+        @media (max-width: 768px) {
+            .gradient-bg h1 {
+                font-size: 1.5em !important;
+            }
+
+            .upload-zone {
+                padding: 2rem !important;
+            }
+        }
+
+        @media (min-width: 1600px) {
+            .max-w-6xl {
+                max-width: 1400px !important;
+            }
+        }
+
+        /* 渐变背景深色主题 */
+        .bg-gradient-to-r {
+            background: linear-gradient(to right, rgba(59, 130, 246, 0.15), rgba(102, 126, 234, 0.15)) !important;
+            border-color: rgba(102, 126, 234, 0.3) !important;
+        }
+
+        .bg-gradient-to-br {
+            background: linear-gradient(to bottom right, rgba(79, 70, 229, 0.2), rgba(147, 51, 234, 0.2)) !important;
+        }
+
+        /* 进度条背景 */
+        .bg-gray-200 {
+            background: rgba(102, 126, 234, 0.2) !important;
+        }
+
+        /* 按钮悬停效果优化 */
+        .hover\:bg-gray-50:hover {
+            background-color: rgba(102, 126, 234, 0.15) !important;
+        }
+
+        .hover\:shadow-lg:hover {
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3) !important;
+        }
+
+        .hover\:bg-green-700:hover {
+            background-color: #16a34a !important;
+        }
+
+        /* 下拉菜单选项 */
+        .text-blue-800 {
+            color: #93c5fd !important;
+        }
+
+        .text-blue-600 {
+            color: #60a5fa !important;
+        }
+
+        .text-orange-600 {
+            color: #fb923c !important;
+        }
+
+        .text-green-600 {
+            color: #4ade80 !important;
+        }
+
+        .text-green-800 {
+            color: #86efac !important;
+        }
+
+        .text-indigo-600 {
+            color: #818cf8 !important;
+        }
+
+        .text-indigo-500 {
+            color: #6366f1 !important;
+        }
+
+        /* 提示标签背景 */
+        .bg-indigo-100 {
+            background: rgba(102, 126, 234, 0.2) !important;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .bg-orange-50 {
+            background: rgba(249, 115, 22, 0.15) !important;
+            border: 1px solid rgba(249, 115, 22, 0.3);
+        }
+
+        .bg-blue-50 {
+            background: rgba(59, 130, 246, 0.15) !important;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .bg-green-50 {
+            background: rgba(34, 197, 94, 0.15) !important;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-900 min-h-screen">
     <!-- 导航栏 -->
     <nav class="gradient-bg text-white shadow-lg">
         <div class="max-w-6xl mx-auto px-4 py-4">
@@ -120,7 +294,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"></path>
                     </svg>
                     <div>
-                        <h1 class="text-2xl font-bold">音频预处理</h1>
+                        <h1 class="text-2xl font-bold">GPU音频预处理</h1>
                         <p class="text-sm opacity-90">RTX 5090加速 · 动态范围压缩</p>
                     </div>
                 </div>
@@ -239,7 +413,7 @@
                             <div class="flex justify-between mb-2">
                                 <div>
                                     <label class="text-sm font-medium text-gray-700">启动时间</label>
-                                    <span class="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">一般保持5ms</span>
+                                    <span class="ml-2 text-xs text-gray-500 bg-indigo-100 px-2 py-0.5 rounded">一般保持5ms</span>
                                 </div>
                                 <span id="attackValue" class="text-sm font-bold text-indigo-600">5.0 ms</span>
                             </div>
@@ -402,7 +576,7 @@
                 </div>
 
                 <!-- 使用说明 -->
-                <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl card-shadow p-6">
+                <div class="bg-gradient-to-br from-indigo-900/30 to-purple-900/30 rounded-2xl card-shadow p-6 border border-indigo-500/20">
                     <h2 class="text-xl font-semibold mb-4 flex items-center">
                         <svg class="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
