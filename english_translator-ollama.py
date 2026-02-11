@@ -93,6 +93,10 @@ class EnglishTranslator:
         """
         从hotword目录加载热词表
 
+        支持两种格式:
+        1. 冒号分隔: 中文:英文 (推荐)
+        2. 空格分隔: 中文 英文
+
         Args:
             hotword_dir: 热词目录路径
 
@@ -119,40 +123,39 @@ class EnglishTranslator:
                 with open(txt_file, "r", encoding="utf-8") as f:
                     content = f.read()
 
-                # 解析热词（空格分隔，中英文对照）
-                tokens = content.split()
-                i = 0
-                while i < len(tokens):
-                    token = tokens[i].strip()
-                    if not token:
-                        i += 1
+                # 按行分割
+                lines = content.split('\n')
+                loaded_count = 0
+
+                for line in lines:
+                    line = line.strip()
+                    if not line:
                         continue
 
-                    # 判断是否为中文（包含中文字符）
-                    if any('\u4e00' <= ch <= '\u9fff' for ch in token):
-                        chinese = token
-                        # 查找后续的英文翻译
-                        english_parts = []
-                        i += 1
-                        while i < len(tokens):
-                            next_token = tokens[i].strip()
-                            # 如果遇到新的中文或特殊标记，停止
-                            if not next_token:
-                                i += 1
-                                continue
-                            if any('\u4e00' <= ch <= '\u9fff' for ch in next_token):
-                                break
-                            # 是英文或其他非中文内容
-                            english_parts.append(next_token)
-                            i += 1
+                    # 格式1: 冒号分隔 "中文:英文"
+                    if ':' in line:
+                        parts = line.split(':', 1)
+                        if len(parts) == 2:
+                            chinese = parts[0].strip()
+                            english = parts[1].strip()
+                            if chinese and english:
+                                hotword_dict[chinese] = english
+                                loaded_count += 1
 
-                        if english_parts:
-                            english = " ".join(english_parts)
-                            hotword_dict[chinese] = english
+                    # 格式2: 空格分隔 "中文 英文"
                     else:
-                        i += 1
+                        tokens = line.split()
+                        if len(tokens) >= 2:
+                            # 第一个token应该是中文
+                            first_token = tokens[0].strip()
+                            if any('\u4e00' <= ch <= '\u9fff' for ch in first_token):
+                                chinese = first_token
+                                english = " ".join(tokens[1:])
+                                if chinese and english:
+                                    hotword_dict[chinese] = english
+                                    loaded_count += 1
 
-                print(f"  [INFO] 已加载热词文件: {os.path.basename(txt_file)}")
+                print(f"  [INFO] 已加载热词文件: {os.path.basename(txt_file)} ({loaded_count} 个热词)")
 
             except Exception as e:
                 print(f"  [WARN] 加载热词文件失败 {txt_file}: {e}")
