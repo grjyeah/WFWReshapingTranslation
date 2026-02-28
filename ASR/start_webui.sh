@@ -3,6 +3,13 @@
 # FunASR WebUI 启动脚本
 # Windows环境运行先进入Docker容器执行 sed -i 's/\r$//' /root/FunASR/start_webui.sh
 
+## 通过交互式命令到funasr容器内执行各种命令，或安装工具
+#docker run -it --rm --gpus all -p 6006:6006 -v D:/DockerFolders/FunASR:/root/FunASR funasr:1.2.7 bash
+#
+#--docker 启动命令
+#docker run -d --name funasr-app --gpus all -p 6006:6006 -v D:\DockerFolders\FunASR:/root/FunASR  --restart=unless-stopped funasr:1.2.7  /bin/bash -c "source /root/miniconda3/etc/profile.d/conda.sh && conda activate base && cd /root/FunASR && exec ./start_webui.sh"
+
+
 echo "========================================="
 echo "🎤 FunASR WebUI 启动器"
 echo "========================================="
