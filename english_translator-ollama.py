@@ -12,7 +12,7 @@ class EnglishTranslator:
     """中文会议纪要翻译成英文"""
 
     def __init__(self, lm_studio_url: str = "http://127.0.0.1:1234",
-                 model_name: str = "qwen2.5-7b-instruct-1m",
+                 model_name: str = "openai/gpt-oss-20b",
                  prompt_xml_path: str = None,
                  hotword_dir: str = None):
         self.lm_studio_url = lm_studio_url
