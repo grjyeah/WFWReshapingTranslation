@@ -12,9 +12,22 @@ class ChineseFormatter:
 
     def __init__(self, lm_studio_url: str = "http://127.0.0.1:1234",
                  model_name: str = "qwen2.5-7b-instruct-1m",
-                 prompt_xml_path: str = None):
+                 prompt_xml_path: str = None,
+                 seed: int = 42):
+        """
+        初始化中文格式化器
+
+        Args:
+            lm_studio_url: LM Studio 服务地址
+            model_name: 使用的模型名称
+            prompt_xml_path: 提示词XML文件路径
+            seed: 随机种子，用于提高输出稳定性。
+                  相同输入下，固定seed会产生一致输出，适合规范化任务。
+                  设为None则完全随机。默认42。
+        """
         self.lm_studio_url = lm_studio_url
         self.model_name = model_name
+        self.seed = seed
         self.api_endpoint = f"{lm_studio_url}/v1/chat/completions"
 
         # 从XML文件加载提示词
@@ -27,6 +40,7 @@ class ChineseFormatter:
 
         # 模型参数配置（优化为精简书面化输出）- LM Studio OpenAI兼容格式
         self.model_options = {
+            "seed": seed,  # 随机种子，固定后相同输入产生一致输出，提高稳定性
             "num_ctx": 8192,  # 上下文窗口大小
             "num_predict": 4096,  # 提高最大输出，确保足够篇幅
             "num_batch": 1024,  # 默认即可，或设为 1024 提升吞吐
