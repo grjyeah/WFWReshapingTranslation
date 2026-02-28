@@ -622,7 +622,7 @@ class ChineseFormatter:
             print(f"  预处理后: {len(preprocessed)} 字符")
 
             # 保存预处理副本用于核验（保存到processed目录）
-            processed_dir = "processed"
+            processed_dir = "processed/remove_english"
             os.makedirs(processed_dir, exist_ok=True)
             preprocessed_filename = os.path.join(processed_dir, self._generate_timestamped_filename("preprocessed_no_english.txt"))
             try:
