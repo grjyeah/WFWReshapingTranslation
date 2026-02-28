@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # FunASR WebUI 启动脚本
+# Windows环境运行先进入Docker容器执行 sed -i 's/\r$//' /root/FunASR/start_webui.sh
 
 echo "========================================="
 echo "🎤 FunASR WebUI 启动器"
