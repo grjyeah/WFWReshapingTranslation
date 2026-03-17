@@ -11,7 +11,7 @@ class ChineseFormatter:
     """中文会议逐字稿书面化处理"""
 
     def __init__(self, lm_studio_url: str = "http://127.0.0.1:1234",
-                 model_name: str = "qwen2.5-7b-instruct-1m",
+                 model_name: str = "openai/gpt-oss-20b",
                  prompt_xml_path: str = None,
                  seed: int = 42):
         """
@@ -44,7 +44,7 @@ class ChineseFormatter:
             "num_ctx": 8192,  # 上下文窗口大小
             "num_predict": 4096,  # 提高最大输出，确保足够篇幅
             "num_batch": 1024,  # 默认即可，或设为 1024 提升吞吐
-            "temperature": 0.6,  # 降低温度，使输出更稳定
+            "temperature": 0.9,  # 降低温度，使输出更稳定
             "top_p": 0.8,  # 提高top-p，增加内容多样性
             "top_k": 40,  # 降低top-k，更聚焦
             "repeat_penalty": 1.08,  # 降低重复惩罚，避免过度精简
@@ -655,7 +655,8 @@ class ChineseFormatter:
             target_length_min = int(chunk_length * 0.7)
             target_length_max = int(chunk_length * 0.8)
 
-            print(f"\n[{i}/{len(chunks)}] 处理中... (输入: {chunk_length} 字符, 目标: {target_length_min}-{target_length_max} 字符)", end=" ")
+            # 单独输出分段信息，便于前端解析
+            print(f"[{i}/{len(chunks)}] 处理中... (输入: {chunk_length} 字符, 目标: {target_length_min}-{target_length_max} 字符)")
 
             # 构建提示词，包含长度信息
             prompt = self.processing_prompt.format(

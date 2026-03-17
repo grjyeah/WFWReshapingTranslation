@@ -607,7 +607,8 @@ class EnglishTranslator:
         total_output_length = 0
 
         for i, chunk in enumerate(chunks, 1):
-            print(f"[{i}/{len(chunks)}] 翻译中... (输入: {len(chunk)} 字符)", end=" ")
+            # 单独输出分段信息，便于前端解析
+            print(f"[{i}/{len(chunks)}] 翻译中... (输入: {len(chunk)} 字符)")
 
             # 构建热词表
             hotword_table = self._format_hotwords_for_prompt()

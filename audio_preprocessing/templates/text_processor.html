@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>董事会会议纪要工作台 - 中文书面化 & 英文翻译</title>
+    <script src="/static/tailwind.js"></script>
+    <style>
+        /* 黑色主题 - 参考 Gradio 风格 */
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1e 100%);
+            min-height: 100vh;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .card-shadow {
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.15);
+            background: rgba(30, 30, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .bg-white {
+            background: rgba(30, 30, 46, 0.95) !important;
+        }
+
+        .text-gray-800, .text-gray-700, .text-gray-600 {
+            color: #e0e0e0 !important;
+        }
+
+        .text-gray-500 {
+            color: #a0a0a0 !important;
+        }
+
+        .text-gray-400 {
+            color: #888888 !important;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            color: #ffffff !important;
+        }
+
+        .text-xl {
+            color: #ffffff !important;
+        }
+
+        .text-indigo-600 {
+            color: #818cf8 !important;
+        }
+
+        .border-gray-200 {
+            border-color: rgba(102, 126, 234, 0.2) !important;
+        }
+
+        .border-gray-300 {
+            border-color: rgba(102, 126, 234, 0.3) !important;
+        }
+
+        /* 日志窗口样式 */
+        .log-window {
+            background: rgba(10, 10, 20, 0.95);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 4px 12px;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .log-info { color: #93c5fd; }
+        .log-success { color: #4ade80; }
+        .log-warning { color: #fb923c; }
+        .log-error { color: #f87171; }
+        .log-process { color: #c4b5fd; }
+
+        /* 文本编辑器样式 */
+        .text-editor {
+            background: rgba(15, 15, 30, 0.9);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: #e0e0e0;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .text-editor:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        /* 参数输入框样式 */
+        .param-input {
+            background: rgba(20, 20, 35, 0.8);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: #e0e0e0;
+        }
+
+        .param-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        /* 步骤指示器 */
+        .step-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .step-inactive {
+            background: rgba(102, 126, 234, 0.2);
+            color: #a0a0a0;
+        }
+
+        .step-active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.5);
+        }
+
+        .step-completed {
+            background: rgba(74, 222, 128, 0.3);
+            color: #4ade80;
+            border: 1px solid #4ade80;
+        }
+
+        /* 标签页样式 */
+        .tab-btn {
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+            color: #9ca3af !important; /* 非active状态使用浅灰色 */
+        }
+
+        .tab-btn.active {
+            color: #818cf8 !important;
+            border-bottom-color: #818cf8;
+        }
+
+        .tab-btn:hover {
+            color: #e0e0e0 !important; /* hover时使用更亮的灰色 */
+        }
+
+        /* 按钮样式 */
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: rgba(102, 126, 234, 0.15);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: #e0e0e0;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(102, 126, 234, 0.25);
+            border-color: #667eea;
+        }
+
+        /* 加载动画 */
+        .loader {
+            border: 3px solid rgba(102, 126, 234, 0.2);
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 滚动条样式 */
+        .log-window::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-window::-webkit-scrollbar-track {
+            background: rgba(10, 10, 20, 0.5);
+        }
+
+        .log-window::-webkit-scrollbar-thumb {
+            background: rgba(102, 126, 234, 0.5);
+            border-radius: 4px;
+        }
+
+        .log-window::-webkit-scrollbar-thumb:hover {
+            background: rgba(102, 126, 234, 0.7);
+        }
+
+        /* 状态值样式 - 白色字体 */
+        .status-value {
+            color: #ffffff !important;
+        }
+
+        /* 状态值特殊颜色 */
+        #processStatus.status-idle {
+            color: #818cf8 !important;
+        }
+
+        #processStatus.status-processing {
+            color: #fbbf24 !important;
+        }
+
+        #processStatus.status-error {
+            color: #f87171 !important;
+        }
+
+        #processStatus.status-success {
+            color: #4ade80 !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <div>
+                        <h1 class="text-xl font-bold">董事会会议纪要工作台</h1>
+                        <p class="text-xs opacity-90">中文书面化 · 英文翻译 · LLM驱动</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-sm opacity-75 hover:opacity-100 transition-opacity">
+                        <span class="flex items-center space-x-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                            </svg>
+                            <span>音频处理</span>
+                        </span>
+                    </a>
+                    <div id="connectionStatus" class="flex items-center space-x-2 bg-white/20 px-3 py-1.5 rounded-lg">
+                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                        <span class="text-xs">已连接</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容 -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <!-- 工作流步骤指示器 -->
+        <div class="bg-white rounded-2xl card-shadow p-4 mb-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="step-indicator step-active" id="step1">1</div>
+                    <div>
+                        <h3 class="font-semibold text-sm">中文书面化</h3>
+                        <p class="text-xs text-gray-500">去除口语、整合段落</p>
+                    </div>
+                </div>
+                <div class="flex-1 h-0.5 mx-4 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                <div class="flex items-center space-x-3">
+                    <div class="step-indicator step-inactive" id="step2">2</div>
+                    <div>
+                        <h3 class="font-semibold text-sm">人工校对</h3>
+                        <p class="text-xs text-gray-500">编辑书面化结果</p>
+                    </div>
+                </div>
+                <div class="flex-1 h-0.5 mx-4 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+                <div class="flex items-center space-x-3">
+                    <div class="step-indicator step-inactive" id="step3">3</div>
+                    <div>
+                        <h3 class="font-semibold text-sm">英文翻译</h3>
+                        <p class="text-xs text-gray-500">翻译为正式英文</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左侧：配置面板 -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- 标签页切换 -->
+                <div class="bg-white rounded-2xl card-shadow">
+                    <div class="flex border-b border-gray-200">
+                        <button class="tab-btn active flex-1 py-3 px-4 font-medium text-sm" data-tab="formatter">
+                            <span class="flex items-center justify-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                                <span>中文书面化</span>
+                            </span>
+                        </button>
+                        <button class="tab-btn flex-1 py-3 px-4 font-medium text-sm" data-tab="translator">
+                            <span class="flex items-center justify-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                                </svg>
+                                <span>英文翻译</span>
+                            </span>
+                        </button>
+                    </div>
+
+                    <!-- 中文书面化配置 -->
+                    <div class="tab-content p-6" id="formatterTab">
+                        <h3 class="text-lg font-semibold mb-4">中文书面化配置</h3>
+
+                        <!-- 模型配置 -->
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">模型名称</label>
+                                <input type="text" id="formatterModel" class="param-input w-full px-3 py-2 rounded-lg" value="openai/gpt-oss-20b">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">API地址</label>
+                                <input type="text" id="formatterUrl" class="param-input w-full px-3 py-2 rounded-lg" value="http://127.0.0.1:1234">
+                            </div>
+                        </div>
+
+                        <!-- 模型参数 -->
+                        <div class="mb-6">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3">模型参数</h4>
+                            <div class="grid grid-cols-4 gap-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">温度</label>
+                                    <input type="number" id="formatterTemp" class="param-input w-full px-2 py-1.5 rounded text-sm" value="0.9" step="0.1" min="0" max="2">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Top-P</label>
+                                    <input type="number" id="formatterTopP" class="param-input w-full px-2 py-1.5 rounded text-sm" value="0.8" step="0.05" min="0" max="1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Top-K</label>
+                                    <input type="number" id="formatterTopK" class="param-input w-full px-2 py-1.5 rounded text-sm" value="40" step="1" min="1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">随机种子</label>
+                                    <input type="number" id="formatterSeed" class="param-input w-full px-2 py-1.5 rounded text-sm" value="42" step="1">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 提示词模板 -->
+                        <div class="mb-6">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-gray-700">提示词模板</label>
+                                <button id="loadFormatterPrompt" class="text-xs text-indigo-500 hover:text-indigo-400">重新加载</button>
+                            </div>
+                            <textarea id="formatterPrompt" class="text-editor w-full h-40 px-3 py-2 rounded-lg text-sm" placeholder="提示词模板..."></textarea>
+                        </div>
+
+                        <!-- 输入文本 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-gray-700">输入文本</label>
+                                <div class="flex items-center space-x-2 text-xs text-gray-500">
+                                    <span id="formatterInputCount">0 字符</span>
+                                    <button id="clearFormatterInput" class="text-red-400 hover:text-red-300">清空</button>
+                                </div>
+                            </div>
+                            <textarea id="formatterInput" class="text-editor w-full h-48 px-3 py-2 rounded-lg" placeholder="粘贴会议逐字稿文本...&#10;&#10;示例格式：&#10;【说话人:0】那个...我觉得这个项目...&#10;【说话人:1】好的，那我们接下来..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- 英文翻译配置 -->
+                    <div class="tab-content p-6 hidden" id="translatorTab">
+                        <h3 class="text-lg font-semibold mb-4">英文翻译配置</h3>
+
+                        <!-- 模型配置 -->
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">模型名称</label>
+                                <input type="text" id="translatorModel" class="param-input w-full px-3 py-2 rounded-lg" value="openai/gpt-oss-20b">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">API地址</label>
+                                <input type="text" id="translatorUrl" class="param-input w-full px-3 py-2 rounded-lg" value="http://127.0.0.1:1234">
+                            </div>
+                        </div>
+
+                        <!-- 模型参数 -->
+                        <div class="mb-6">
+                            <h4 class="text-sm font-semibold text-gray-700 mb-3">模型参数</h4>
+                            <div class="grid grid-cols-4 gap-3">
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">温度</label>
+                                    <input type="number" id="translatorTemp" class="param-input w-full px-2 py-1.5 rounded text-sm" value="0.5" step="0.1" min="0" max="2">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Top-P</label>
+                                    <input type="number" id="translatorTopP" class="param-input w-full px-2 py-1.5 rounded text-sm" value="0.85" step="0.05" min="0" max="1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">Top-K</label>
+                                    <input type="number" id="translatorTopK" class="param-input w-full px-2 py-1.5 rounded text-sm" value="30" step="1" min="1">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-500 mb-1">随机种子</label>
+                                    <input type="number" id="translatorSeed" class="param-input w-full px-2 py-1.5 rounded text-sm" value="42" step="1">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 提示词模板 -->
+                        <div class="mb-6">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-gray-700">提示词模板</label>
+                                <button id="loadTranslatorPrompt" class="text-xs text-indigo-500 hover:text-indigo-400">重新加载</button>
+                            </div>
+                            <textarea id="translatorPrompt" class="text-editor w-full h-40 px-3 py-2 rounded-lg text-sm" placeholder="提示词模板..."></textarea>
+                        </div>
+
+                        <!-- 热词表 -->
+                        <div class="mb-6">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-gray-700">热词表</label>
+                                <span id="hotwordCount" class="text-xs text-gray-500">已加载 0 个热词</span>
+                            </div>
+                            <textarea id="hotwordTable" class="text-editor w-full h-32 px-3 py-2 rounded-lg text-sm" placeholder="格式: 中文:英文&#10;例如:&#10;张总:Mr. Zhang&#10;数据治理:data governance"></textarea>
+                        </div>
+
+                        <!-- 输入文本 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-gray-700">输入文本（中文）</label>
+                                <div class="flex items-center space-x-2 text-xs text-gray-500">
+                                    <span id="translatorInputCount">0 字符</span>
+                                    <button id="useFormatterOutput" class="text-indigo-400 hover:text-indigo-300">使用书面化结果</button>
+                                    <button id="clearTranslatorInput" class="text-red-400 hover:text-red-300">清空</button>
+                                </div>
+                            </div>
+                            <textarea id="translatorInput" class="text-editor w-full h-32 px-3 py-2 rounded-lg" placeholder="粘贴中文书面化后的文本..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 输出区域 -->
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">处理结果</h3>
+                        <div class="flex items-center space-x-2">
+                            <span id="outputCount" class="text-xs text-gray-500">0 字符</span>
+                            <button id="copyOutput" class="text-xs text-indigo-500 hover:text-indigo-400">复制</button>
+                            <button id="clearOutput" class="text-xs text-red-400 hover:text-red-300">清空</button>
+                        </div>
+                    </div>
+                    <textarea id="outputText" class="text-editor w-full h-64 px-3 py-2 rounded-lg" placeholder="处理结果将显示在这里..." readonly></textarea>
+                </div>
+            </div>
+
+            <!-- 右侧：控制面板和日志 -->
+            <div class="space-y-6">
+                <!-- 执行控制 -->
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <h3 class="text-lg font-semibold mb-4">执行控制</h3>
+
+                    <div class="space-y-4">
+                        <button id="runFormatterBtn" class="btn-primary w-full text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center space-x-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                            <span>执行中文书面化</span>
+                        </button>
+
+                        <button id="runTranslatorBtn" class="btn-secondary w-full font-semibold py-3 px-6 rounded-xl flex items-center justify-center space-x-2" disabled>
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                            </svg>
+                            <span>执行英文翻译</span>
+                        </button>
+
+                        <button id="stopBtn" class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-xl flex items-center justify-center space-x-2 hidden">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                            </svg>
+                            <span>停止执行</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 运行日志 -->
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">运行日志</h3>
+                        <div class="flex items-center space-x-2">
+                            <button id="clearLog" class="text-xs text-gray-500 hover:text-gray-400">清空</button>
+                            <button id="exportLog" class="text-xs text-indigo-500 hover:text-indigo-400">导出</button>
+                        </div>
+                    </div>
+                    <div id="logWindow" class="log-window rounded-lg p-2">
+                        <div class="log-entry log-info">[系统] 文本处理工作台已就绪</div>
+                    </div>
+                </div>
+
+                <!-- 状态信息 -->
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <h3 class="text-lg font-semibold mb-4">当前状态</h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">处理状态:</span>
+                            <span id="processStatus" class="font-medium status-value">空闲</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">当前步骤:</span>
+                            <span id="currentStep" class="font-medium status-value">-</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">处理进度:</span>
+                            <span id="processProgress" class="font-medium status-value">0%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500">耗时:</span>
+                            <span id="processTime" class="font-medium status-value">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-gray-800 text-white py-4 mt-8">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p class="text-xs opacity-75">文本处理工作台 · 中文书面化 · 英文翻译 · Powered by LLM</p>
+        </div>
+    </footer>
+
+    <script>
+        // API基础URL
+        const API_BASE_URL = '/api/text';
+
+        // 状态变量
+        let currentProcess = null;
+        let processAbortController = null;
+        let processStartTime = null;
+        let logEntries = [];
+        let totalSegments = 0;  // 总分段数
+        let currentSegment = 0;  // 当前分段
+        let progressInterval = null;  // 进度更新定时器
+
+        // DOM元素
+        const logWindow = document.getElementById('logWindow');
+        const outputText = document.getElementById('outputText');
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initTabSwitching();
+            initEventListeners();
+            loadInitialData();
+        });
+
+        // 初始化标签页切换
+        function initTabSwitching() {
+            const tabs = document.querySelectorAll('.tab-btn');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const targetTab = tab.dataset.tab;
+
+                    // 更新标签按钮状态
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+
+                    // 更新内容区域
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.add('hidden');
+                    });
+                    document.getElementById(targetTab + 'Tab').classList.remove('hidden');
+                });
+            });
+        }
+
+        // 初始化事件监听
+        function initEventListeners() {
+            // 加载提示词按钮
+            document.getElementById('loadFormatterPrompt').addEventListener('click', () => loadPrompt('formatter'));
+            document.getElementById('loadTranslatorPrompt').addEventListener('click', () => loadPrompt('translator'));
+
+            // 输入文本计数
+            document.getElementById('formatterInput').addEventListener('input', updateInputCount);
+            document.getElementById('translatorInput').addEventListener('input', updateInputCount);
+
+            // 清空按钮
+            document.getElementById('clearFormatterInput').addEventListener('click', () => {
+                document.getElementById('formatterInput').value = '';
+                updateInputCount();
+            });
+            document.getElementById('clearTranslatorInput').addEventListener('click', () => {
+                document.getElementById('translatorInput').value = '';
+                updateInputCount();
+            });
+
+            // 使用书面化结果
+            document.getElementById('useFormatterOutput').addEventListener('click', () => {
+                const output = document.getElementById('outputText').value;
+                if (output) {
+                    document.getElementById('translatorInput').value = output;
+                    updateInputCount();
+                    addLog('info', '已将书面化结果填入翻译输入');
+                } else {
+                    addLog('warning', '没有可用的书面化结果');
+                }
+            });
+
+            // 输出区域按钮
+            document.getElementById('copyOutput').addEventListener('click', copyOutput);
+            document.getElementById('clearOutput').addEventListener('click', () => {
+                document.getElementById('outputText').value = '';
+                document.getElementById('outputCount').textContent = '0 字符';
+            });
+
+            // 执行按钮
+            document.getElementById('runFormatterBtn').addEventListener('click', () => runProcess('formatter'));
+            document.getElementById('runTranslatorBtn').addEventListener('click', () => runProcess('translator'));
+            document.getElementById('stopBtn').addEventListener('click', stopProcess);
+
+            // 日志按钮
+            document.getElementById('clearLog').addEventListener('click', clearLog);
+            document.getElementById('exportLog').addEventListener('click', exportLog);
+        }
+
+        // 加载初始数据
+        async function loadInitialData() {
+            try {
+                // 加载提示词
+                await loadPrompt('formatter');
+                await loadPrompt('translator');
+
+                // 加载热词表
+                await loadHotwords();
+
+                addLog('success', '初始数据加载完成');
+            } catch (error) {
+                addLog('error', '初始数据加载失败: ' + error.message);
+            }
+        }
+
+        // 加载提示词
+        async function loadPrompt(type) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/prompt/${type}`);
+                if (!response.ok) throw new Error('加载失败');
+
+                const data = await response.json();
+                document.getElementById(type + 'Prompt').value = data.prompt;
+                addLog('info', `已加载${type === 'formatter' ? '中文书面化' : '英文翻译'}提示词`);
+            } catch (error) {
+                addLog('error', `加载提示词失败: ${error.message}`);
+            }
+        }
+
+        // 加载热词表
+        async function loadHotwords() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/hotwords`);
+                if (!response.ok) throw new Error('加载失败');
+
+                const data = await response.json();
+                document.getElementById('hotwordTable').value = data.hotwords;
+                document.getElementById('hotwordCount').textContent = `已加载 ${data.count} 个热词`;
+                addLog('info', `已加载热词表 (${data.count} 个)`);
+            } catch (error) {
+                addLog('error', `加载热词表失败: ${error.message}`);
+            }
+        }
+
+        // 更新输入计数
+        function updateInputCount() {
+            const formatterInput = document.getElementById('formatterInput').value;
+            const translatorInput = document.getElementById('translatorInput').value;
+
+            document.getElementById('formatterInputCount').textContent = formatterInput.length + ' 字符';
+            document.getElementById('translatorInputCount').textContent = translatorInput.length + ' 字符';
+        }
+
+        // 执行处理
+        async function runProcess(type) {
+            const inputId = type + 'Input';
+            const input = document.getElementById(inputId).value.trim();
+
+            if (!input) {
+                addLog('warning', '请输入要处理的文本');
+                return;
+            }
+
+            // 收集配置
+            const config = collectConfig(type);
+
+            // 创建AbortController用于停止处理
+            processAbortController = new AbortController();
+
+            // 重置分段信息
+            totalSegments = 0;
+            currentSegment = 0;
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+
+            // 更新UI状态
+            setProcessingState(true);
+            processStartTime = Date.now();
+            updateTimer();
+
+            addLog('process', `开始执行${type === 'formatter' ? '中文书面化' : '英文翻译'}...`);
+            updateStep(type === 'formatter' ? 1 : 3);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/run/${type}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: input,
+                        config: config
+                    }),
+                    signal: processAbortController.signal
+                });
+
+                if (!response.ok) throw new Error('处理请求失败');
+
+                // 处理流式响应
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                let result = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+
+                                if (data.type === 'log') {
+                                    // 过滤无意义的日志：空行、只有点号、只有换行符等
+                                    const message = data.message.trim();
+                                    const isMeaningful = message.length > 0 &&
+                                                        message !== '.' &&
+                                                        message !== '...' &&
+                                                        message !== '..' &&
+                                                        !message.startsWith('\\n') &&
+                                                        !message.match(/^[. \t]+$/);
+
+                                    if (isMeaningful) {
+                                        // 清理消息中的转义换行符
+                                        const cleanMessage = message.replace(/\\n/g, ' ').replace(/\\r/g, ' ').replace(/\\t/g, ' ');
+
+                                        // 解析分段信息
+                                        // 格式：[X/Y] 处理中... 或 [X/Y] 翻译中...
+                                        const segmentMatch = cleanMessage.match(/\[(\d+)\/(\d+)\]\s*(?:处理中|翻译中)/);
+                                        if (segmentMatch) {
+                                            currentSegment = parseInt(segmentMatch[1]);
+                                            totalSegments = parseInt(segmentMatch[2]);
+
+                                            // 更新进度显示
+                                            const progress = Math.round((currentSegment / totalSegments) * 100);
+                                            document.getElementById('processProgress').textContent = progress + '%';
+                                            document.getElementById('currentStep').textContent = `分段 ${currentSegment}/${totalSegments}`;
+                                        }
+
+                                        addLog(data.level, cleanMessage);
+                                    }
+                                } else if (data.type === 'progress') {
+                                    document.getElementById('processProgress').textContent = data.progress + '%';
+                                } else if (data.type === 'result') {
+                                    result += data.content;
+                                    document.getElementById('outputText').value = result;
+                                    document.getElementById('outputCount').textContent = result.length + ' 字符';
+                                    // 自动滚动到底部
+                                    document.getElementById('outputText').scrollTop = document.getElementById('outputText').scrollHeight;
+                                } else if (data.type === 'complete') {
+                                    addLog('success', `处理完成! 输出 ${data.stats.output_length} 字符，耗时 ${data.stats.duration}秒`);
+                                    completeStep(type === 'formatter' ? 1 : 3);
+
+                                    // 停止进度更新定时器
+                                    if (progressInterval) {
+                                        clearInterval(progressInterval);
+                                        progressInterval = null;
+                                    }
+
+                                    // 启用下一步按钮
+                                    if (type === 'formatter') {
+                                        document.getElementById('runTranslatorBtn').disabled = false;
+                                        document.getElementById('runTranslatorBtn').classList.add('btn-primary');
+                                        document.getElementById('runTranslatorBtn').classList.remove('btn-secondary');
+                                    }
+                                } else if (data.type === 'error') {
+                                    throw new Error(data.message);
+                                }
+                            } catch (parseError) {
+                                // JSON解析错误，可能是特殊字符问题
+                                console.warn('JSON解析错误:', line, parseError);
+                                // 尝试直接显示原始消息
+                                if (line.includes('message')) {
+                                    try {
+                                        // 提取message字段的值
+                                        const match = line.match(/"message":"([^"]*)"/);
+                                        if (match) {
+                                            const rawMessage = match[1];
+                                            // 同样解析分段信息
+                                            const segmentMatch = rawMessage.match(/\[(\d+)\/(\d+)\]\s*(?:处理中|翻译中)/);
+                                            if (segmentMatch) {
+                                                currentSegment = parseInt(segmentMatch[1]);
+                                                totalSegments = parseInt(segmentMatch[2]);
+                                                const progress = Math.round((currentSegment / totalSegments) * 100);
+                                                document.getElementById('processProgress').textContent = progress + '%';
+                                                document.getElementById('currentStep').textContent = `分段 ${currentSegment}/${totalSegments}`;
+                                            }
+                                            addLog('warning', '日志: ' + rawMessage);
+                                        }
+                                    } catch (e) {
+                                        // 忽略
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                // 如果是中止错误，不显示为错误
+                if (error.name === 'AbortError') {
+                    addLog('warning', '处理已被中止');
+                } else {
+                    addLog('error', `处理失败: ${error.message}`);
+                }
+            } finally {
+                // 停止进度更新定时器
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                    progressInterval = null;
+                }
+                setProcessingState(false);
+            }
+        }
+
+        // 收集配置
+        function collectConfig(type) {
+            return {
+                model_name: document.getElementById(type + 'Model').value,
+                lm_studio_url: document.getElementById(type + 'Url').value,
+                model_options: {
+                    temperature: parseFloat(document.getElementById(type + 'Temp').value),
+                    top_p: parseFloat(document.getElementById(type + 'TopP').value),
+                    top_k: parseInt(document.getElementById(type + 'TopK').value),
+                    seed: parseInt(document.getElementById(type + 'Seed').value)
+                },
+                prompt: document.getElementById(type + 'Prompt').value,
+                hotwords: type === 'translator' ? document.getElementById('hotwordTable').value : undefined
+            };
+        }
+
+        // 停止处理
+        function stopProcess() {
+            if (processAbortController) {
+                processAbortController.abort();
+                processAbortController = null;
+                addLog('warning', '用户已停止处理');
+                setProcessingState(false);
+            } else {
+                addLog('warning', '没有正在运行的处理任务');
+            }
+        }
+
+        // 设置处理状态
+        function setProcessingState(processing) {
+            const runFormatterBtn = document.getElementById('runFormatterBtn');
+            const runTranslatorBtn = document.getElementById('runTranslatorBtn');
+            const stopBtn = document.getElementById('stopBtn');
+
+            runFormatterBtn.disabled = processing;
+            runTranslatorBtn.disabled = processing;
+            stopBtn.classList.toggle('hidden', !processing);
+
+            const processStatus = document.getElementById('processStatus');
+            processStatus.textContent = processing ? '处理中...' : '空闲';
+
+            // 移除所有状态类
+            processStatus.classList.remove('status-idle', 'status-processing', 'status-error', 'status-success');
+
+            // 添加相应的状态类
+            if (processing) {
+                processStatus.classList.add('status-processing', 'status-value');
+            } else {
+                processStatus.classList.add('status-idle', 'status-value');
+            }
+        }
+
+        // 更新步骤状态
+        function updateStep(step) {
+            document.getElementById('currentStep').textContent = `步骤 ${step}`;
+            document.getElementById(`step${step}`).classList.remove('step-inactive', 'step-completed');
+            document.getElementById(`step${step}`).classList.add('step-active');
+        }
+
+        // 完成步骤
+        function completeStep(step) {
+            document.getElementById(`step${step}`).classList.remove('step-active');
+            document.getElementById(`step${step}`).classList.add('step-completed');
+
+            if (step === 1) {
+                document.getElementById('step2').classList.remove('step-inactive');
+                document.getElementById('step2').classList.add('step-active');
+            } else if (step === 3) {
+                document.getElementById('currentStep').textContent = '全部完成';
+            }
+        }
+
+        // 更新计时器
+        function updateTimer() {
+            if (!processStartTime) return;
+
+            const elapsed = Math.floor((Date.now() - processStartTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            document.getElementById('processTime').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+            if (document.getElementById('processStatus').textContent === '处理中...') {
+                setTimeout(updateTimer, 1000);
+            }
+        }
+
+        // 添加日志
+        function addLog(level, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+
+            logEntries.push({ timestamp, level, message });
+
+            const levelClass = {
+                info: 'log-info',
+                success: 'log-success',
+                warning: 'log-warning',
+                error: 'log-error',
+                process: 'log-process'
+            }[level];
+
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${levelClass}`;
+            logEntry.textContent = entry;
+
+            logWindow.appendChild(logEntry);
+            logWindow.scrollTop = logWindow.scrollHeight;
+        }
+
+        // 清空日志
+        function clearLog() {
+            logWindow.innerHTML = '<div class="log-entry log-info">[系统] 日志已清空</div>';
+            logEntries = [];
+        }
+
+        // 导出日志
+        function exportLog() {
+            const content = logEntries.map(e => `[${e.timestamp}] [${e.level.toUpperCase()}] ${e.message}`).join('\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `text_processor_log_${new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')}.txt`;
+            link.click();
+
+            URL.revokeObjectURL(url);
+            addLog('info', '日志已导出');
+        }
+
+        // 复制输出
+        function copyOutput() {
+            const output = document.getElementById('outputText').value;
+            if (!output) {
+                addLog('warning', '没有可复制的内容');
+                return;
+            }
+
+            navigator.clipboard.writeText(output).then(() => {
+                addLog('success', '已复制到剪贴板');
+            }).catch(err => {
+                addLog('error', '复制失败: ' + err.message);
+            });
+        }
+    </script>
+</body>
+</html>
