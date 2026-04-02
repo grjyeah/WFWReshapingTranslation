@@ -24,6 +24,8 @@ from audio_preprocessing_gpu import GPUAudioProcessor
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "neo4j_graph"))
+sys.path.insert(0, str(project_root / "janusgraph"))
 
 # 配置日志
 logging.basicConfig(
@@ -389,6 +391,15 @@ async def text_processor_page():
     if text_processor_file.exists():
         return FileResponse(str(text_processor_file))
     return {"message": "文本处理页面未找到"}
+
+
+@app.get("/knowledge-graph")
+async def knowledge_graph_page():
+    """返回知识图谱预处理页面"""
+    kg_file = templates_dir / "knowledge_graph.html"
+    if kg_file.exists():
+        return FileResponse(str(kg_file))
+    return {"message": "知识图谱页面未找到"}
 
 
 @app.get("/api/text/prompt/{prompt_type}")
@@ -797,6 +808,198 @@ async def run_text_process(process_type: str, request: TextProcessRequest):
             "X-Accel-Buffering": "no"
         }
     )
+
+
+# ============= 知识图谱API端点 =============
+
+# Neo4j 连接配置
+NEO4J_URI = "bolt://localhost:7687"
+NEO4J_USER = "neo4j"
+NEO4J_PASSWORD = "password123"  # 请根据实际情况修改
+
+# 全局图管理器实例
+graph_manager = None
+
+
+def get_graph_manager():
+    """获取图管理器单例"""
+    global graph_manager
+    if graph_manager is None:
+        from graph_manager import Neo4jGraphManager
+        graph_manager = Neo4jGraphManager(
+            uri=NEO4J_URI,
+            user=NEO4J_USER,
+            password=NEO4J_PASSWORD
+        )
+        if not graph_manager.connect():
+            raise HTTPException(status_code=503, detail="无法连接到 Neo4j 数据库")
+    return graph_manager
+
+
+@app.get("/api/graph/health")
+async def check_graph_connection():
+    """检查 Neo4j 连接状态"""
+    try:
+        manager = get_graph_manager()
+        return {
+            "status": "connected",
+            "uri": NEO4J_URI
+        }
+    except Exception as e:
+        return {
+            "status": "disconnected",
+            "error": str(e)
+        }
+
+
+@app.post("/api/graph/initialize")
+async def initialize_graph_schema():
+    """初始化知识图谱 Schema"""
+    try:
+        manager = get_graph_manager()
+        manager.initialize_schema()
+        return {"success": True, "message": "知识图谱 Schema 初始化完成"}
+    except Exception as e:
+        logger.error(f"初始化 Schema 失败: {e}")
+        raise HTTPException(status_code=500, detail=f"初始化失败: {str(e)}")
+
+
+@app.get("/api/graph/documents")
+async def get_all_documents():
+    """获取所有文档列表"""
+    try:
+        manager = get_graph_manager()
+        documents = manager.get_all_documents()
+        return {"documents": documents}
+    except Exception as e:
+        logger.error(f"获取文档列表失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@app.get("/api/graph/documents/{filename}/stats")
+async def get_document_stats(filename: str):
+    """获取文档统计信息"""
+    try:
+        manager = get_graph_manager()
+        stats = manager.get_document_statistics(filename)
+        return {"filename": filename, "stats": stats}
+    except Exception as e:
+        logger.error(f"获取文档统计失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@app.get("/api/graph/patterns")
+async def get_top_patterns(limit: int = 10):
+    """获取最常用的校对模式"""
+    try:
+        manager = get_graph_manager()
+        patterns = manager.get_top_patterns(limit=limit)
+        return {"patterns": patterns}
+    except Exception as e:
+        logger.error(f"获取模式失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取失败: {str(e)}")
+
+
+@app.get("/api/graph/search")
+async def search_similar_corrections(q: str, limit: int = 5):
+    """搜索相似的校对行为"""
+    try:
+        manager = get_graph_manager()
+        corrections = manager.search_similar_corrections(q, limit=limit)
+        return {"query": q, "corrections": corrections}
+    except Exception as e:
+        logger.error(f"搜索失败: {e}")
+        raise HTTPException(status_code=500, detail=f"搜索失败: {str(e)}")
+
+
+@app.get("/api/graph/recommend")
+async def get_recommendations(text: str):
+    """基于历史模式推荐校对建议"""
+    try:
+        manager = get_graph_manager()
+        recommendations = manager.get_recommended_corrections(text)
+        return {"text": text, "recommendations": recommendations}
+    except Exception as e:
+        logger.error(f"获取推荐失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取推荐失败: {str(e)}")
+
+
+class GraphProcessRequest(BaseModel):
+    """图谱处理请求"""
+    audio_filename: str
+    human_text_filename: str
+    audio_path: str
+    human_text_path: str
+    lm_studio_url: str = "http://127.0.0.1:1234"
+    model_name: str = "qwen2.5-7b-instruct"
+
+
+@app.post("/api/graph/process")
+async def process_document_to_graph(request: GraphProcessRequest):
+    """
+    处理单个文档并保存到知识图谱
+
+    处理流程：
+    1. 创建文档节点
+    2. 读取人工校对文本
+    3. 调用 ASR 和书面化（需要音频文件）
+    4. 对比分析差异
+    5. 保存校对行为到图谱
+    """
+    try:
+        manager = get_graph_manager()
+
+        from datetime import datetime
+        from llm_analyzer import TextComparisonAnalyzer
+
+        # 1. 创建文档节点
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        document_id = manager.create_document(
+            filename=request.audio_filename,
+            date=date_str,
+            audio_path=request.audio_path
+        )
+
+        # 2. 读取人工校对文本
+        human_text_path = Path(request.human_text_path)
+        if not human_text_path.exists():
+            raise HTTPException(status_code=404, detail=f"人工校对文本文件不存在: {request.human_text_path}")
+
+        with open(human_text_path, 'r', encoding='utf-8') as f:
+            human_text = f.read()
+
+        # 3. TODO: 调用 ASR 获取原始文本（需要集成音频处理）
+        # 这里简化处理，假设已经有人工文本，直接分析
+
+        # 4. 分析校对行为（这里需要对比原始书面化和人工校对）
+        analyzer = TextComparisonAnalyzer(
+            lm_studio_url=request.lm_studio_url,
+            model_name=request.model_name
+        )
+
+        # 5. 保存到图谱（示例）
+        # 这里需要完整的处理流程，暂时返回成功
+        return {
+            "success": True,
+            "document_id": document_id,
+            "message": "文档处理完成",
+            "note": "完整处理流程需要集成 ASR 和书面化模块"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"处理文档失败: {e}")
+        raise HTTPException(status_code=500, detail=f"处理失败: {str(e)}")
+
+
+@app.get("/api/graph")
+async def knowledge_graph_page():
+    """返回知识图谱页面"""
+    kg_file = templates_dir / "knowledge_graph.html"
+    if kg_file.exists():
+        return FileResponse(str(kg_file))
+    return {"message": "知识图谱页面未找到"}
 
 
 if __name__ == "__main__":

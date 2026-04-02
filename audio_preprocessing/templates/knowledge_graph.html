@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识图谱预处理 - 批量上传</title>
+    <script src="/static/tailwind.js"></script>
+    <style>
+        /* 复用现有样式 */
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1e 100%);
+            min-height: 100vh;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .card-shadow {
+            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.15);
+            background: rgba(30, 30, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .bg-white {
+            background: rgba(30, 30, 46, 0.95) !important;
+        }
+
+        .text-gray-800, .text-gray-700, .text-gray-600 {
+            color: #e0e0e0 !important;
+        }
+
+        .text-gray-500 {
+            color: #a0a0a0 !important;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            color: #ffffff !important;
+        }
+
+        .text-indigo-600 {
+            color: #818cf8 !important;
+        }
+
+        /* 文件上传区域 */
+        .upload-zone {
+            border: 2px dashed rgba(102, 126, 234, 0.5);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: rgba(15, 15, 30, 0.5);
+        }
+
+        .upload-zone:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .upload-zone.drag-over {
+            border-color: #4ade80;
+            background: rgba(74, 222, 128, 0.1);
+        }
+
+        /* 文件列表 */
+        .file-item {
+            background: rgba(15, 15, 30, 0.8);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-item.audio {
+            border-left: 4px solid #667eea;
+        }
+
+        .file-item.text {
+            border-left: 4px solid #4ade80;
+        }
+
+        .file-item.missing {
+            border-left: 4px solid #f87171;
+            opacity: 0.6;
+        }
+
+        /* 按钮样式 */
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 进度条 */
+        .progress-bar {
+            height: 8px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+
+        /* 状态标签 */
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-pending {
+            background: rgba(102, 126, 234, 0.2);
+            color: #818cf8;
+        }
+
+        .status-processing {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+
+        .status-completed {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+
+        .status-error {
+            background: rgba(248, 113, 113, 0.2);
+            color: #f87171;
+        }
+
+        /* 统计卡片 */
+        .stat-card {
+            background: rgba(15, 15, 30, 0.8);
+            border: 1px solid rgba(102, 126, 234, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #818cf8;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #a0a0a0;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    </svg>
+                    <div>
+                        <h1 class="text-xl font-bold">知识图谱预处理</h1>
+                        <p class="text-xs opacity-90">批量上传 · 智能分析 · 模式学习</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/text" class="text-sm opacity-75 hover:opacity-100 transition-opacity">
+                        <span class="flex items-center space-x-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span>文本处理</span>
+                        </span>
+                    </a>
+                    <a href="/" class="text-sm opacity-75 hover:opacity-100 transition-opacity">
+                        <span class="flex items-center space-x-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                            </svg>
+                            <span>音频处理</span>
+                        </span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容 -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- 说明区域 -->
+        <div class="bg-white rounded-2xl card-shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-3">📚 使用说明</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <h3 class="font-medium text-indigo-400 mb-2">1️⃣ 准备文件</h3>
+                    <p class="text-sm text-gray-500">将音频文件和对应的人工校对文本放在同一目录下，文件名必须相同（扩展名不同）。</p>
+                    <div class="mt-2 p-3 bg-gray-800 rounded-lg">
+                        <code class="text-xs text-green-400">
+                            示例：<br>
+                            📁 meeting_001.mp3<br>
+                            📄 meeting_001.txt<br>
+                            📁 meeting_002.mp3<br>
+                            📄 meeting_002.txt
+                        </code>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="font-medium text-indigo-400 mb-2">2️⃣ 上传文件</h3>
+                    <p class="text-sm text-gray-500">选择要上传的文件夹，系统会自动识别音频文件和对应的人工校对文本。</p>
+                </div>
+                <div>
+                    <h3 class="font-medium text-indigo-400 mb-2">3️⃣ 开始分析</h3>
+                    <p class="text-sm text-gray-500">系统会自动进行书面化、对比分析、提取校对模式，并保存到知识图谱中。</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左侧：上传区域 -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- 文件上传 -->
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <h3 class="text-lg font-semibold mb-4">📁 文件上传</h3>
+
+                    <!-- 上传区域 -->
+                    <div id="uploadZone" class="upload-zone cursor-pointer">
+                        <svg class="w-16 h-16 mx-auto mb-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        <p class="text-lg font-medium mb-2">点击或拖拽文件夹到这里</p>
+                        <p class="text-sm text-gray-500">支持批量上传多个文件</p>
+                        <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden">
+                    </div>
+
+                    <!-- 操作按钮 -->
+                    <div class="mt-4 flex space-x-3">
+                        <button id="clearFilesBtn" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors">
+                            清空文件
+                        </button>
+                        <button id="startProcessBtn" class="px-6 py-2 btn-primary text-white rounded-lg font-medium" disabled>
+                            开始处理
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 文件列表 -->
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">📄 文件列表</h3>
+                        <span id="fileCount" class="text-sm text-gray-500">0 个文件</span>
+                    </div>
+
+                    <div id="fileList" class="space-y-2 max-h-96 overflow-y-auto">
+                        <p class="text-center text-gray-500 py-8">暂无文件</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：统计和状态 -->
+            <div class="space-y-6">
+                <!-- 统计卡片 -->
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <h3 class="text-lg font-semibold mb-4">📊 处理统计</h3>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="stat-card">
+                            <div id="statTotal" class="stat-value">0</div>
+                            <div class="stat-label">总文件数</div>
+                        </div>
+                        <div class="stat-card">
+                            <div id="statCompleted" class="stat-value">0</div>
+                            <div class="stat-label">已完成</div>
+                        </div>
+                        <div class="stat-card">
+                            <div id="statProcessing" class="stat-value">0</div>
+                            <div class="stat-label">处理中</div>
+                        </div>
+                        <div class="stat-card">
+                            <div id="statErrors" class="stat-value">0</div>
+                            <div class="stat-label">错误</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 当前进度 -->
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <h3 class="text-lg font-semibold mb-4">⏳ 当前进度</h3>
+
+                    <div class="space-y-4">
+                        <div>
+                            <div class="flex justify-between text-sm mb-2">
+                                <span>整体进度</span>
+                                <span id="overallProgressText">0%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="overallProgressBar" class="progress-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div id="currentFileCard" class="p-4 bg-gray-800 rounded-lg hidden">
+                            <p class="text-xs text-gray-500 mb-1">当前处理</p>
+                            <p id="currentFileName" class="text-sm font-medium truncate">-</p>
+                            <div class="mt-2 progress-bar">
+                                <div id="currentFileProgress" class="progress-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 日志窗口 -->
+                <div class="bg-white rounded-2xl card-shadow p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold">📝 处理日志</h3>
+                        <button id="clearLogBtn" class="text-xs text-gray-500 hover:text-gray-400">清空</button>
+                    </div>
+
+                    <div id="logWindow" class="h-48 overflow-y-auto p-3 bg-gray-900 rounded-lg font-mono text-xs">
+                        <div class="text-gray-500">等待开始处理...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 状态管理
+        const state = {
+            files: [],
+            processing: false,
+            stats: {
+                total: 0,
+                completed: 0,
+                processing: 0,
+                errors: 0
+            }
+        };
+
+        // DOM 元素
+        const uploadZone = document.getElementById('uploadZone');
+        const folderInput = document.getElementById('folderInput');
+        const fileList = document.getElementById('fileList');
+        const fileCount = document.getElementById('fileCount');
+        const startProcessBtn = document.getElementById('startProcessBtn');
+        const clearFilesBtn = document.getElementById('clearFilesBtn');
+        const logWindow = document.getElementById('logWindow');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+
+        // 事件监听
+        uploadZone.addEventListener('click', () => folderInput.click());
+        uploadZone.addEventListener('dragover', handleDragOver);
+        uploadZone.addEventListener('dragleave', handleDragLeave);
+        uploadZone.addEventListener('drop', handleDrop);
+        folderInput.addEventListener('change', handleFileSelect);
+        startProcessBtn.addEventListener('click', startProcessing);
+        clearFilesBtn.addEventListener('click', clearFiles);
+        clearLogBtn.addEventListener('click', clearLog);
+
+        // 拖拽处理
+        function handleDragOver(e) {
+            e.preventDefault();
+            uploadZone.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            const items = e.dataTransfer.items;
+            if (items) {
+                const files = [];
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i].webkitGetAsEntry();
+                    if (item) {
+                        traverseFileTree(item, files);
+                    }
+                }
+            }
+        }
+
+        // 遍历文件树
+        function traverseFileTree(item, files) {
+            if (item.isFile) {
+                item.file(file => {
+                    files.push(file);
+                    checkFilePairs();
+                });
+            } else if (item.isDirectory) {
+                const dirReader = item.createReader();
+                dirReader.readEntries(entries => {
+                    entries.forEach(entry => traverseFileTree(entry, files));
+                });
+            }
+        }
+
+        // 文件选择处理
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            state.files = files;
+            checkFilePairs();
+            renderFileList();
+        }
+
+        // 检查文件配对
+        function checkFilePairs() {
+            const audioFiles = new Set();
+            const textFiles = new Set();
+
+            state.files.forEach(file => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                const baseName = file.name.replace(/\.[^.]+$/, '');
+
+                if (['mp3', 'wav', 'm4a', 'flac'].includes(ext)) {
+                    audioFiles.add(baseName);
+                } else if (['txt', 'md'].includes(ext)) {
+                    textFiles.add(baseName);
+                }
+            });
+
+            // 标记缺失的配对
+            state.files.forEach(file => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                const baseName = file.name.replace(/\.[^.]+$/, '');
+
+                if (['mp3', 'wav', 'm4a', 'flac'].includes(ext)) {
+                    file.hasPair = textFiles.has(baseName);
+                    file.pairName = baseName + (textFiles.has(baseName + '.txt') ? '.txt' : '.md');
+                } else if (['txt', 'md'].includes(ext)) {
+                    file.hasPair = audioFiles.has(baseName);
+                    file.pairName = baseName + '.mp3';
+                }
+            });
+
+            updateStats();
+        }
+
+        // 渲染文件列表
+        function renderFileList() {
+            if (state.files.length === 0) {
+                fileList.innerHTML = '<p class="text-center text-gray-500 py-8">暂无文件</p>';
+                return;
+            }
+
+            const html = state.files.map(file => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                const isAudio = ['mp3', 'wav', 'm4a', 'flac'].includes(ext);
+                const statusClass = isAudio ? 'audio' : 'text';
+                const missingClass = file.hasPair === false ? 'missing' : '';
+                const statusIcon = file.hasPair === false ? '⚠️ ' : '';
+
+                return `
+                    <div class="file-item ${statusClass} ${missingClass}">
+                        <div class="flex items-center space-x-3">
+                            <span>${statusIcon}${file.name}</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-gray-500">${formatFileSize(file.size)}</span>
+                            ${file.hasPair === false ? '<span class="text-xs text-red-400">缺失配对</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            fileList.innerHTML = html;
+            fileCount.textContent = `${state.files.length} 个文件`;
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // 更新统计
+        function updateStats() {
+            const audioFiles = state.files.filter(f => {
+                const ext = f.name.split('.').pop().toLowerCase();
+                return ['mp3', 'wav', 'm4a', 'flac'].includes(ext) && f.hasPair;
+            });
+
+            state.stats.total = audioFiles.length;
+            document.getElementById('statTotal').textContent = state.stats.total;
+
+            startProcessBtn.disabled = audioFiles.length === 0;
+        }
+
+        // 开始处理
+        async function startProcessing() {
+            if (state.processing) return;
+
+            state.processing = true;
+            startProcessBtn.disabled = true;
+            addLog('info', '开始批量处理...');
+
+            const audioFiles = state.files.filter(f => {
+                const ext = f.name.split('.').pop().toLowerCase();
+                return ['mp3', 'wav', 'm4a', 'flac'].includes(ext) && f.hasPair;
+            });
+
+            for (let i = 0; i < audioFiles.length; i++) {
+                const file = audioFiles[i];
+                const progress = ((i + 1) / audioFiles.length) * 100;
+
+                // 更新当前文件
+                document.getElementById('currentFileCard').classList.remove('hidden');
+                document.getElementById('currentFileName').textContent = file.name;
+                document.getElementById('currentFileProgress').style.width = `${((i + 1) / audioFiles.length) * 100}%`;
+
+                // 更新整体进度
+                document.getElementById('overallProgressText').textContent = `${Math.round(progress)}%`;
+                document.getElementById('overallProgressBar').style.width = `${progress}%`;
+                document.getElementById('statProcessing').textContent = i + 1;
+
+                addLog('process', `处理 ${i + 1}/${audioFiles.length}: ${file.name}`);
+
+                try {
+                    // TODO: 实际的处理逻辑
+                    await processFile(file);
+                    state.stats.completed++;
+                    document.getElementById('statCompleted').textContent = state.stats.completed;
+                    addLog('success', `✓ 完成: ${file.name}`);
+                } catch (error) {
+                    state.stats.errors++;
+                    document.getElementById('statErrors').textContent = state.stats.errors;
+                    addLog('error', `✗ 失败: ${file.name} - ${error.message}`);
+                }
+            }
+
+            state.processing = false;
+            startProcessBtn.disabled = false;
+            addLog('success', '批量处理完成！');
+        }
+
+        // 处理单个文件
+        async function processFile(audioFile) {
+            // 模拟处理延迟
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // TODO: 实际的处理逻辑
+            // 1. 上传音频文件
+            // 2. 调用 ASR 获取文本
+            // 3. 调用书面化
+            // 4. 读取人工校对文本
+            // 5. 对比分析
+            // 6. 保存到知识图谱
+        }
+
+        // 清空文件
+        function clearFiles() {
+            state.files = [];
+            state.stats = { total: 0, completed: 0, processing: 0, errors: 0 };
+            renderFileList();
+            updateStats();
+            folderInput.value = '';
+        }
+
+        // 添加日志
+        function addLog(level, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const levelClass = {
+                info: 'text-blue-400',
+                success: 'text-green-400',
+                warning: 'text-yellow-400',
+                error: 'text-red-400',
+                process: 'text-purple-400'
+            }[level];
+
+            const logEntry = document.createElement('div');
+            logEntry.className = `mb-1 ${levelClass}`;
+            logEntry.innerHTML = `<span class="text-gray-500">[${timestamp}]</span> ${message}`;
+
+            logWindow.appendChild(logEntry);
+            logWindow.scrollTop = logWindow.scrollHeight;
+        }
+
+        // 清空日志
+        function clearLog() {
+            logWindow.innerHTML = '<div class="text-gray-500">日志已清空</div>';
+        }
+    </script>
+</body>
+</html>

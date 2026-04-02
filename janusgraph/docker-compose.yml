@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Cassandra - 后端存储
+  cassandra:
+    image: cassandra:4.1
+    container_name: meeting_cassandra
+    ports:
+      - "9042:9042"  # CQL
+      - "7000:7000"  # Cluster
+      - "7001:7001"  # SSL
+      - "7199:7199"  # JMX
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    environment:
+      - MAX_HEAP_SIZE=1G
+      - HEAP_NEWSIZE=200M
+      - CASSANDRA_CLUSTER_NAME=MeetingCluster
+      - CASSANDRA_DC=datacenter1
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe cluster' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - meeting_network
+
+  # Elasticsearch - 索引后端
+  elasticsearch:
+    image: elasticsearch:8.11.0
+    container_name: meeting_elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - "cluster.routing.allocation.disk.threshold_enabled=false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - meeting_network
+
+  # JanusGraph Server
+  janusgraph:
+    image: janusgraph/janusgraph:1.0.0
+    container_name: meeting_janusgraph
+    ports:
+      - "8182:8182"  # Gremlin WebSocket
+      - "8183:8183"  # Gremlin REST
+    volumes:
+      - ./janusgraph-config.properties:/opt/janusgraph/conf/janusgraph-cql-es-config.properties
+      - janusgraph_data:/var/lib/janusgraph
+    environment:
+      - JANUSGRAPH_STORAGE_BACKEND=cql
+      - JANUSGRAPH_STORAGE_HOSTNAME=cassandra
+      - JANUSGRAPH_INDEX_SEARCH_BACKEND=elasticsearch
+      - JANUSGRAPH_INDEX_SEARCH_HOSTNAME=elasticsearch
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    command: >
+      bash -c "
+        echo 'Waiting for Cassandra...' &&
+        until cqlsh cassandra -e 'describe cluster'; do sleep 5; done &&
+        echo 'Waiting for Elasticsearch...' &&
+        until curl -s http://elasticsearch:9200/_cluster/health; do sleep 5; done &&
+        echo 'Starting JanusGraph...' &&
+        bin/janusgraph-server.sh conf/gremlin-server/gremlin-server.yaml
+      "
+    networks:
+      - meeting_network
+
+volumes:
+  cassandra_data:
+  es_data:
+  janusgraph_data:
+
+networks:
+  meeting_network:
+    driver: bridge
